@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Advanced Layout Manager</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
         :root {
             /* Atmosphere Variables */
@@ -138,9 +138,9 @@
         }
         .window-lifted {
             box-shadow: 25px 25px 50px var(--nm-dark), -15px -15px 30px var(--nm-light) !important;
-            opacity: 0.95;
+            opacity: 0.4; /* Lowered opacity to keep focus on the cursor preview */
             transform: scale(1.02);
-            transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.2), box-shadow 0.2s ease;
+            transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.2), box-shadow 0.2s ease, opacity 0.2s ease;
         }
         body.snap-active * {
             cursor: crosshair !important;
@@ -150,9 +150,70 @@
             background-color: color-mix(in srgb, var(--accent) 20%, transparent);
             border-color: var(--accent);
         }
+
+        /* --- Brutalist Theme Overrides --- */
+        body[data-theme="brutal"] {
+            --primary: #46674d;
+            --bg: #f5f5f7;
+            --text: #282e29;
+            --accent: #54bb85;
+            --font-main: 'Inter', sans-serif;
+            --radius: 18px;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        body[data-theme="brutal"] .card, 
+        body[data-theme="brutal"] .window-card {
+            border: 3px solid var(--text);
+            box-shadow: 10px 10px 0px var(--text);
+        }
+
+        body[data-theme="brutal"] .card:hover {
+            transform: translateY(-4px);
+            box-shadow: 14px 14px 0px var(--text);
+        }
+
+        body[data-theme="brutal"] .btn {
+            background-color: var(--primary); 
+            color: white; 
+            border: 3px solid var(--text); 
+            box-shadow: 5px 5px 0px var(--text);
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        body[data-theme="brutal"] .btn:active, 
+        body[data-theme="brutal"] .btn.active-tab {
+            transform: scale(0.97); 
+            opacity: 0.85;
+            box-shadow: 2px 2px 0px var(--text);
+            color: white;
+        }
+
+        body[data-theme="brutal"] .nm-inner {
+            box-shadow: inset 4px 4px 0px color-mix(in srgb, var(--text) 15%, transparent);
+            border: 2px solid var(--text);
+            border-radius: calc(var(--radius) / 1.5);
+            background-color: var(--bg);
+        }
+
+        body[data-theme="brutal"] .window-lifted {
+            box-shadow: 20px 20px 0px var(--text) !important;
+            opacity: 1; /* Remove transparency for brutalist lifted state */
+        }
+
+        body[data-theme="brutal"] .ghost-snap-mode {
+            box-shadow: 0 0 0 4px var(--accent), 10px 10px 0px var(--accent) !important;
+            border-radius: var(--radius);
+        }
+        
+        body[data-theme="brutal"] #ui-drop-overlay {
+            background-color: color-mix(in srgb, var(--accent) 25%, transparent);
+            border: 4px dashed var(--accent);
+            border-radius: var(--radius);
+        }
     </style>
 </head>
-<body class="h-screen flex flex-col">
+<body class="h-screen flex flex-col" data-theme="default">
 
     <!-- Topbar: Workspaces & Controls -->
     <header id="ui-topbar" class="h-16 flex items-center px-6 justify-between shrink-0 z-40 relative">
@@ -165,6 +226,10 @@
                 <span class="text-xs font-bold mr-2 text-[var(--primary)] opacity-70">DOCK</span>
                 <!-- Minimized windows go here -->
             </div>
+            <button id="ui-btn-theme-toggle" onclick="System.toggleTheme()" class="btn text-sm">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
+                Theme Toggle
+            </button>
             <button id="ui-btn-new-window" onclick="System.addRandomWindow()" class="btn text-sm">
                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
                 New Window
@@ -179,6 +244,17 @@
 
     <!-- Drop Zone Highlight Overlay -->
     <div id="ui-drop-overlay" class="fixed border-2 rounded-2xl pointer-events-none z-50 snap-transition hidden backdrop-blur-[2px]"></div>
+
+    <!-- Drag Instructions -->
+    <div id="ui-drag-instructions" class="fixed top-0 left-0 -translate-x-1/2 -translate-y-[calc(100%+5px)] card !py-3 !px-6 z-[100] flex gap-6 items-center opacity-0 pointer-events-none transition-opacity duration-200 data-[show=true]:opacity-100">
+        <span class="text-sm font-bold text-[var(--primary)] flex items-center"><kbd class="nm-inner px-2 py-1 rounded-md text-xs mr-2 font-mono">Shift</kbd> Snap</span>
+        <span class="text-sm font-bold text-[var(--primary)] flex items-center"><kbd class="nm-inner px-2 py-1 rounded-md text-xs mr-2 font-mono">Ctrl</kbd> Group</span>
+    </div>
+
+    <!-- Drag Preview Thumbnail -->
+    <div id="ui-drag-preview" class="fixed top-0 left-0 -translate-x-1/2 translate-y-[10px] card !p-0 w-48 h-32 z-[100] flex flex-col overflow-hidden opacity-0 pointer-events-none transition-opacity duration-200 data-[show=true]:opacity-100 border-2 border-[var(--primary)]/20 shadow-2xl">
+        <!-- populated dynamically via JS -->
+    </div>
 
     <script>
         /**
@@ -453,12 +529,36 @@
                 document.addEventListener('keydown', onDragKey);
                 document.addEventListener('keyup', onDragKey);
 
-                if (e.shiftKey) {
+                if (e.shiftKey || e.ctrlKey || e.metaKey) {
                     floatEl.classList.add('ghost-snap-mode');
                     document.body.classList.add('snap-active');
                 } else {
                     floatEl.classList.add('window-lifted');
                 }
+
+                const instr = document.getElementById('ui-drag-instructions');
+                instr.style.left = `${e.clientX}px`;
+                instr.style.top = `${e.clientY}px`;
+                instr.dataset.show = 'true';
+
+                // Setup the Window Preview Thumbnail
+                const preview = document.getElementById('ui-drag-preview');
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = nodeData.content || '';
+                const textContent = tempDiv.textContent || tempDiv.innerText || '';
+                
+                preview.innerHTML = `
+                    <div class="h-8 flex items-center px-3 bg-[var(--primary)] text-[var(--bg)] shrink-0">
+                        <svg class="w-3.5 h-3.5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"/></svg>
+                        <div class="text-[10px] font-bold truncate uppercase tracking-wider">${nodeData.title || 'Untitled'}</div>
+                    </div>
+                    <div class="flex-1 p-3 text-[10px] opacity-80 overflow-hidden bg-[var(--bg)] nm-inner m-1 rounded">
+                        ${textContent.substring(0, 120)}...
+                    </div>
+                `;
+                preview.style.left = `${e.clientX}px`;
+                preview.style.top = `${e.clientY}px`;
+                preview.dataset.show = 'true';
 
                 return true;
             }
@@ -499,11 +599,25 @@
 
                 if (!e.isMock) {
                     updateGhostPosition(e.clientX, e.clientY);
+                    
+                    const instr = document.getElementById('ui-drag-instructions');
+                    if (instr && instr.dataset.show === 'true') {
+                        instr.style.left = `${e.clientX}px`;
+                        instr.style.top = `${e.clientY}px`;
+                    }
+
+                    const preview = document.getElementById('ui-drag-preview');
+                    if (preview && preview.dataset.show === 'true') {
+                        preview.style.left = `${e.clientX}px`;
+                        preview.style.top = `${e.clientY}px`;
+                    }
                 }
 
                 const overlay = document.getElementById('ui-drop-overlay');
 
-                if (e.shiftKey) {
+                const isModifierHeld = e.shiftKey || e.ctrlKey || e.metaKey;
+
+                if (isModifierHeld) {
                     state.drag.ghostEl.classList.add('ghost-snap-mode');
                     state.drag.ghostEl.classList.remove('window-lifted');
                     document.body.classList.add('snap-active');
@@ -531,45 +645,55 @@
                         const minEdgeDist = Math.min(distLeft, distRight, distTop, distBottom);
                         const SNAP_THRESHOLD = 40; // Pixels
 
-                        let zone = 'center'; 
+                        let zone = null; 
 
                         if (targetIsEmptyRoot) {
                             zone = 'center';
-                        } else if (minEdgeDist < SNAP_THRESHOLD) {
-                            if (minEdgeDist === distLeft) zone = 'left';
-                            else if (minEdgeDist === distRight) zone = 'right';
-                            else if (minEdgeDist === distTop) zone = 'top';
-                            else if (minEdgeDist === distBottom) zone = 'bottom';
-                        } else {
-                            const relX = x - rect.left;
-                            const relY = y - rect.top;
-                            const w = rect.width;
-                            const h = rect.height;
-                            const threshold = 0.25;
+                        } else if (e.ctrlKey || e.metaKey) {
+                            zone = 'center';
+                        } else if (e.shiftKey) {
+                            if (minEdgeDist < SNAP_THRESHOLD) {
+                                if (minEdgeDist === distLeft) zone = 'left';
+                                else if (minEdgeDist === distRight) zone = 'right';
+                                else if (minEdgeDist === distTop) zone = 'top';
+                                else if (minEdgeDist === distBottom) zone = 'bottom';
+                            } else {
+                                const relX = x - rect.left;
+                                const relY = y - rect.top;
+                                const w = rect.width;
+                                const h = rect.height;
+                                const threshold = 0.33;
 
-                            if (relX < w * threshold) zone = 'left';
-                            else if (relX > w * (1 - threshold)) zone = 'right';
-                            else if (relY < h * threshold) zone = 'top';
-                            else if (relY > h * (1 - threshold)) zone = 'bottom';
+                                if (relX < w * threshold) zone = 'left';
+                                else if (relX > w * (1 - threshold)) zone = 'right';
+                                else if (relY < h * threshold) zone = 'top';
+                                else if (relY > h * (1 - threshold)) zone = 'bottom';
+                            }
                         }
 
-                        state.drag.activeTargetId = activeTarget.dataset.id;
-                        state.drag.activeZone = zone;
+                        if (zone) {
+                            state.drag.activeTargetId = activeTarget.dataset.id;
+                            state.drag.activeZone = zone;
 
-                        // Update visual overlay
-                        let oTop = rect.top, oLeft = rect.left, oWidth = rect.width, oHeight = rect.height;
-                        
-                        if (zone === 'left') oWidth /= 2;
-                        if (zone === 'right') { oLeft += oWidth/2; oWidth /= 2; }
-                        if (zone === 'top') oHeight /= 2;
-                        if (zone === 'bottom') { oTop += oHeight/2; oHeight /= 2; }
-                        if (zone === 'center' && !targetIsEmptyRoot) { oTop += 10; oLeft += 10; oWidth -= 20; oHeight -= 20; }
+                            // Update visual overlay
+                            let oTop = rect.top, oLeft = rect.left, oWidth = rect.width, oHeight = rect.height;
+                            
+                            if (zone === 'left') oWidth /= 2;
+                            if (zone === 'right') { oLeft += oWidth/2; oWidth /= 2; }
+                            if (zone === 'top') oHeight /= 2;
+                            if (zone === 'bottom') { oTop += oHeight/2; oHeight /= 2; }
+                            if (zone === 'center' && !targetIsEmptyRoot) { oTop += 10; oLeft += 10; oWidth -= 20; oHeight -= 20; }
 
-                        overlay.style.top = `${oTop}px`;
-                        overlay.style.left = `${oLeft}px`;
-                        overlay.style.width = `${oWidth}px`;
-                        overlay.style.height = `${oHeight}px`;
-                        overlay.style.display = 'block';
+                            overlay.style.top = `${oTop}px`;
+                            overlay.style.left = `${oLeft}px`;
+                            overlay.style.width = `${oWidth}px`;
+                            overlay.style.height = `${oHeight}px`;
+                            overlay.style.display = 'block';
+                        } else {
+                            state.drag.activeTargetId = null;
+                            state.drag.activeZone = null;
+                            overlay.style.display = 'none';
+                        }
                     } else {
                         state.drag.activeTargetId = null;
                         state.drag.activeZone = null;
@@ -619,12 +743,14 @@
                     render(); // Cancels snap, leaves window floating safely
                     return;
                 }
-                if (e.key === 'Shift') {
+                if (e.key === 'Shift' || e.key === 'Control' || e.key === 'Meta') {
                     // Re-trigger layout calculation based on shift state without moving mouse
                     onDragMove({ 
                         clientX: state.drag.lastX, 
                         clientY: state.drag.lastY, 
-                        shiftKey: e.type === 'keydown',
+                        shiftKey: e.shiftKey,
+                        ctrlKey: e.ctrlKey,
+                        metaKey: e.metaKey,
                         isMock: true 
                     });
                 }
@@ -634,6 +760,8 @@
                 if (state.drag.ghostEl) {
                     state.drag.ghostEl.classList.remove('ghost-snap-mode', 'window-lifted');
                 }
+                document.getElementById('ui-drag-instructions').dataset.show = 'false';
+                document.getElementById('ui-drag-preview').dataset.show = 'false';
                 document.getElementById('ui-drop-overlay').style.display = 'none';
                 document.body.classList.remove('is-dragging', 'snap-active');
                 document.removeEventListener('mousemove', onDragMove);
@@ -911,6 +1039,14 @@
                         const w = ws.floatingWindows.splice(idx, 1)[0];
                         ws.floatingWindows.push(w);
                         render();
+                    }
+                },
+                toggleTheme: () => {
+                    const body = document.body;
+                    if (body.dataset.theme === 'brutal') {
+                        body.dataset.theme = 'default';
+                    } else {
+                        body.dataset.theme = 'brutal';
                     }
                 }
             };
