@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Layout Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Atmosphere Variables */
+            --primary: #2c4625;
+            --bg: #e6e5db;
+            --text: #383a27;
+            --accent: #127814;
+            --font-main: 'Montserrat', sans-serif;
+            --radius: 20px;
+
+            /* Adaptive Neomorphic Calculation Engine (Derived from BG) */
+            --nm-light: color-mix(in srgb, var(--bg), white 45%);
+            --nm-dark: color-mix(in srgb, var(--bg), black 18%);
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: var(--font-main);
+            margin: 0;
+            line-height: 1.6;
+            overflow: hidden;
+        }
+
+        /* Base styles and custom scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--bg), black 15%); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--bg), black 25%); }
+
+        .card, .window-card {
+            background-color: var(--bg);
+            border-radius: var(--radius);
+            box-shadow: 10px 10px 20px var(--nm-dark), -10px -10px 20px var(--nm-light);
+            border: none; 
+            transition: all 0.4s ease;
+        }
+
+        .card {
+            padding: 3rem;
+        }
+
+        .card:hover {
+            transform: translateY(-8px);
+            box-shadow: 18px 18px 35px var(--nm-dark), -18px -18px 35px var(--nm-light);
+        }
+
+        /* Window-specific card modifier (removes padding for layout management) */
+        .window-card {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.5rem 1.2rem;
+            border-radius: calc(var(--radius) / 2);
+            font-weight: 700;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            background-color: var(--bg); 
+            color: var(--primary); 
+            box-shadow: 6px 6px 12px var(--nm-dark), -6px -6px 12px var(--nm-light); 
+            border: none;
+        }
+
+        .btn:active, .btn.active-tab {
+            box-shadow: inset 4px 4px 8px var(--nm-dark), inset -4px -4px 8px var(--nm-light);
+            color: var(--accent);
+        }
+
+        /* Neomorphic Inner content area */
+        .nm-inner {
+            box-shadow: inset 6px 6px 12px var(--nm-dark), inset -6px -6px 12px var(--nm-light);
+            border-radius: calc(var(--radius) / 1.5);
+            background-color: var(--bg);
+        }
+
+        /* Smooth spring-based transitions for layout changes */
+        .spring-transition {
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.1);
+        }
+        
+        /* Fast transition for snap overlays */
+        .snap-transition {
+            transition: all 0.15s ease-out;
+        }
+
+        /* Splitters */
+        .split-resizer-v { cursor: col-resize; z-index: 10; width: 12px; margin: 0 -6px; background: transparent; position: relative; }
+        .split-resizer-v::after { content: ''; position: absolute; top: 0; bottom: 0; left: 5px; right: 5px; background: color-mix(in srgb, var(--bg), black 10%); border-radius: 4px; transition: background 0.2s; }
+        .split-resizer-v:hover::after, .split-resizer-v.active::after { background: var(--accent); }
+
+        .split-resizer-h { cursor: row-resize; z-index: 10; height: 12px; margin: -6px 0; background: transparent; position: relative; }
+        .split-resizer-h::after { content: ''; position: absolute; left: 0; right: 0; top: 5px; bottom: 5px; background: color-mix(in srgb, var(--bg), black 10%); border-radius: 4px; transition: background 0.2s; }
+        .split-resizer-h:hover::after, .split-resizer-h.active::after { background: var(--accent); }
+
+        /* Drag interactions */
+        .drag-shield { display: none; position: absolute; inset: 0; z-index: 50; background: transparent; }
+        body.is-dragging .drag-shield { display: block; }
+        body.is-dragging * { user-select: none !important; }
+
+        /* Floating Window Resize Handle */
+        .resize-handle {
+            position: absolute;
+            right: 10px; bottom: 10px;
+            width: 15px; height: 15px;
+            cursor: nwse-resize;
+            z-index: 20;
+            color: var(--primary);
+            opacity: 0.5;
+        }
+
+        /* Animations */
+        @keyframes popIn {
+            0% { opacity: 0; transform: scale(0.95); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+        .animate-pop { animation: popIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.2) forwards; }
+
+        /* New Drag & Snap Styles */
+        .ghost-snap-mode {
+            box-shadow: 0 0 0 2px var(--accent), 0 10px 25px color-mix(in srgb, var(--accent) 40%, transparent) !important;
+            opacity: 0.9;
+            transition: box-shadow 0.2s ease, opacity 0.2s ease;
+        }
+        .window-lifted {
+            box-shadow: 25px 25px 50px var(--nm-dark), -15px -15px 30px var(--nm-light) !important;
+            opacity: 0.95;
+            transform: scale(1.02);
+            transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.2), box-shadow 0.2s ease;
+        }
+        body.snap-active * {
+            cursor: crosshair !important;
+        }
+        
+        #ui-drop-overlay {
+            background-color: color-mix(in srgb, var(--accent) 20%, transparent);
+            border-color: var(--accent);
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col">
+
+    <!-- Topbar: Workspaces & Controls -->
+    <header id="ui-topbar" class="h-16 flex items-center px-6 justify-between shrink-0 z-40 relative">
+        <div id="ui-workspace-tabs-container" class="flex items-center gap-3">
+            <!-- Workspace tabs injected here -->
+        </div>
+        
+        <div id="ui-topbar-controls" class="flex items-center gap-4">
+            <div id="ui-dock-container" class="nm-inner flex gap-2 items-center px-4 py-2 hidden">
+                <span class="text-xs font-bold mr-2 text-[var(--primary)] opacity-70">DOCK</span>
+                <!-- Minimized windows go here -->
+            </div>
+            <button id="ui-btn-new-window" onclick="System.addRandomWindow()" class="btn text-sm">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                New Window
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Workspace Area -->
+    <main id="ui-workspace-main" class="flex-1 relative p-4 overflow-hidden">
+        <!-- The layout tree is injected here -->
+    </main>
+
+    <!-- Drop Zone Highlight Overlay -->
+    <div id="ui-drop-overlay" class="fixed border-2 rounded-2xl pointer-events-none z-50 snap-transition hidden backdrop-blur-[2px]"></div>
+
+    <script>
+        /**
+         * System Core: Manages State, Drag & Drop Engine, and Rendering.
+         * Built as a clean ES6 Module-pattern singleton.
+         */
+        const System = (() => {
+            // --- Helper: Generate UUID ---
+            const uid = () => Math.random().toString(36).substr(2, 9);
+
+            // --- State Management ---
+            let state = {
+                workspaces: [
+                    {
+                        id: 'ws-1', name: 'Main Dev',
+                        rootNode: {
+                            id: uid(), type: 'split', direction: 'horizontal', ratio: 0.6,
+                            children: [
+                                { id: uid(), type: 'window', title: 'Code Editor', content: '<div class="p-4 font-mono text-sm text-[var(--accent)]">const LayoutEngine = new Engine();<br/>LayoutEngine.start();</div>' },
+                                {
+                                    id: uid(), type: 'split', direction: 'vertical', ratio: 0.5,
+                                    children: [
+                                        { id: uid(), type: 'window', title: 'Terminal', content: '<div class="p-4 font-mono text-sm opacity-80">$ npm start<br/>> Server running on port 3000</div>' },
+                                        { id: uid(), type: 'window', title: 'Preview', content: '<div class="flex items-center justify-center h-full opacity-60 font-bold">App Preview</div>' }
+                                    ]
+                                }
+                            ]
+                        },
+                        floatingWindows: [], maximizedNode: null
+                    },
+                    {
+                        id: 'ws-2', name: 'Monitoring',
+                        rootNode: { id: uid(), type: 'window', title: 'Metrics Dashboard', content: '<div class="flex items-center justify-center h-full text-[var(--accent)] font-bold">System Analytics</div>' },
+                        floatingWindows: [], maximizedNode: null
+                    }
+                ],
+                activeWorkspaceId: 'ws-1',
+                minimizedWindows: [], // Global dock across workspaces
+                
+                // Interaction State
+                drag: { isDragging: false, node: null, ghostEl: null, type: null, startX: 0, startY: 0, lastX: 0, lastY: 0, offsetX: 0, offsetY: 0, sourceFloating: false },
+                splitResize: { isResizing: false, node: null, index: 0, startX: 0, startY: 0, startRatio: 0 }
+            };
+
+            const getWorkspace = () => state.workspaces.find(w => w.id === state.activeWorkspaceId);
+
+            // --- Tree Manipulation Logic ---
+            
+            // Extracts a node by ID from the tree. Cleans up empty splits/tab groups.
+            function extractNodeFromTree(root, id) {
+                if (!root) return { newRoot: null, extracted: null };
+                if (root.id === id) return { newRoot: null, extracted: root };
+
+                if (root.children) {
+                    for (let i = 0; i < root.children.length; i++) {
+                        const { newRoot: childNewRoot, extracted } = extractNodeFromTree(root.children[i], id);
+                        if (extracted) {
+                            if (childNewRoot) {
+                                root.children[i] = childNewRoot;
+                            } else {
+                                root.children.splice(i, 1);
+                                // Cleanup if only 1 child left in a split/tab group
+                                if (root.children.length === 1) {
+                                    return { newRoot: root.children[0], extracted };
+                                }
+                                if (root.children.length === 0) {
+                                    return { newRoot: null, extracted };
+                                }
+                            }
+                            // Maintain valid ratios if split
+                            if (root.type === 'split' && root.children.length > 0) root.ratio = 0.5;
+                            return { newRoot: root, extracted };
+                        }
+                    }
+                }
+                return { newRoot: root, extracted: null };
+            }
+
+            // Inserts a node relative to a target node based on the drop zone
+            function insertNodeIntoTree(root, targetId, newNode, zone) {
+                if (!root) return newNode;
+
+                if (root.id === targetId) {
+                    if (zone === 'center') {
+                        // Merge into Tabs
+                        if (root.type === 'tabGroup') {
+                            root.children.push(newNode);
+                            root.activeTabId = newNode.id;
+                            return root;
+                        } else {
+                            return {
+                                id: uid(), type: 'tabGroup', activeTabId: newNode.id,
+                                children: [root, newNode]
+                            };
+                        }
+                    } else {
+                        // Create Split
+                        const isHoriz = zone === 'left' || zone === 'right';
+                        const isFirst = zone === 'left' || zone === 'top';
+                        return {
+                            id: uid(), type: 'split', direction: isHoriz ? 'horizontal' : 'vertical', ratio: 0.5,
+                            children: isFirst ? [newNode, root] : [root, newNode]
+                        };
+                    }
+                }
+
+                if (root.children) {
+                    root.children = root.children.map(c => insertNodeIntoTree(c, targetId, newNode, zone));
+                }
+                return root;
+            }
+
+            // Find a node deep in the tree (for pop-out or maximize)
+            function findNode(root, id) {
+                if (!root) return null;
+                if (root.id === id) return root;
+                if (root.children) {
+                    for (let c of root.children) {
+                        const found = findNode(c, id);
+                        if (found) return found;
+                    }
+                }
+                return null;
+            }
+
+            // --- Window Actions ---
+            
+            function performWindowAction(id, action, e) {
+                if(e) e.stopPropagation();
+                const ws = getWorkspace();
+                
+                // Find node
+                let nodeToActOn = null;
+                let isFloating = false;
+
+                // Check floating
+                const fIndex = ws.floatingWindows.findIndex(w => w.id === id);
+                if (fIndex > -1) {
+                    nodeToActOn = ws.floatingWindows[fIndex];
+                    isFloating = true;
+                }
+
+                // Check tree
+                if (!nodeToActOn) {
+                    const { extracted, newRoot } = extractNodeFromTree(ws.rootNode, id);
+                    nodeToActOn = extracted;
+                    if(extracted) ws.rootNode = newRoot;
+                }
+
+                // Check minimized
+                if (!nodeToActOn) {
+                    const mIndex = state.minimizedWindows.findIndex(w => w.id === id);
+                    if (mIndex > -1) {
+                        nodeToActOn = state.minimizedWindows.splice(mIndex, 1)[0];
+                    }
+                }
+
+                if (!nodeToActOn) return; // Node not found
+
+                switch(action) {
+                    case 'close':
+                        // Discard node
+                        if(ws.maximizedNode === id) ws.maximizedNode = null;
+                        break;
+                    case 'minimize':
+                        state.minimizedWindows.push(nodeToActOn);
+                        if(ws.maximizedNode === id) ws.maximizedNode = null;
+                        if(isFloating) ws.floatingWindows.splice(fIndex, 1);
+                        break;
+                    case 'maximize':
+                        // Toggle maximize
+                        if (ws.maximizedNode === id) {
+                            ws.maximizedNode = null;
+                            if(isFloating) ws.floatingWindows.push(nodeToActOn);
+                            else ws.rootNode = insertNodeIntoTree(ws.rootNode, ws.rootNode?.id, nodeToActOn, 'right') || nodeToActOn; // Re-insert logic is simplified here; ideally stores previous location
+                        } else {
+                            ws.maximizedNode = id;
+                            if(isFloating) ws.floatingWindows.splice(fIndex, 1);
+                            // We put it back where we found it to keep state, just mark maximized
+                            if(!isFloating && ws.rootNode !== nodeToActOn) {
+                                ws.rootNode = insertNodeIntoTree(ws.rootNode, ws.rootNode?.id, nodeToActOn, 'center') || nodeToActOn; 
+                            }
+                        }
+                        break;
+                    case 'popout':
+                        if (ws.maximizedNode === id) ws.maximizedNode = null;
+                        // Calculate a nice default floating size based on viewport
+                        if(!nodeToActOn.x) {
+                            const rect = document.getElementById('ui-workspace-main').getBoundingClientRect();
+                            nodeToActOn.w = Math.min(800, rect.width * 0.8);
+                            nodeToActOn.h = Math.min(600, rect.height * 0.8);
+                            nodeToActOn.x = rect.width / 2 - nodeToActOn.w / 2;
+                            nodeToActOn.y = rect.height / 2 - nodeToActOn.h / 2;
+                        }
+                        ws.floatingWindows.push(nodeToActOn);
+                        break;
+                    case 'restore':
+                        // From dock to floating
+                        const rect = document.getElementById('ui-workspace-main').getBoundingClientRect();
+                        nodeToActOn.x = rect.width / 2 - 200;
+                        nodeToActOn.y = rect.height / 2 - 150;
+                        nodeToActOn.w = 400; nodeToActOn.h = 300;
+                        ws.floatingWindows.push(nodeToActOn);
+                        break;
+                }
+                
+                render();
+            }
+
+            // --- Drag and Drop Engine (The Core Requirement) ---
+
+            function startDrag(e, id, sourceFloating = false) {
+                if (e.target.closest('.window-controls') || e.target.closest('.resize-handle')) return;
+                
+                const ws = getWorkspace();
+                if(ws.maximizedNode) return; // No dragging while maximized
+
+                state.drag = {
+                    isDragging: false,
+                    originalId: id,
+                    sourceFloating,
+                    startX: e.clientX,
+                    startY: e.clientY,
+                    lastX: e.clientX,
+                    lastY: e.clientY
+                };
+
+                document.addEventListener('mousemove', onDragMove);
+                document.addEventListener('mouseup', onDragEnd);
+            }
+
+            function performDetachment(e) {
+                const ws = getWorkspace();
+                const { originalId, sourceFloating } = state.drag;
+                let nodeData;
+                
+                const rect = document.getElementById('ui-workspace-main').getBoundingClientRect();
+                
+                if (sourceFloating) {
+                    nodeData = ws.floatingWindows.find(w => w.id === originalId);
+                    ws.floatingWindows = ws.floatingWindows.filter(w => w.id !== originalId);
+                    ws.floatingWindows.push(nodeData);
+                } else {
+                    const { extracted, newRoot } = extractNodeFromTree(ws.rootNode, originalId);
+                    if (!extracted) return false;
+                    nodeData = extracted;
+                    ws.rootNode = newRoot;
+                    
+                    nodeData.w = nodeData.w || 400;
+                    nodeData.h = nodeData.h || 300;
+                    nodeData.x = e.clientX - rect.left - (nodeData.w / 2);
+                    nodeData.y = e.clientY - rect.top - 16;
+                    
+                    ws.floatingWindows.push(nodeData);
+                }
+
+                render(); // Remove from tree immediately, spawn as floating
+
+                const floatEl = document.getElementById(`float-${originalId}`);
+                if (!floatEl) return false;
+
+                const floatRect = floatEl.getBoundingClientRect();
+                
+                state.drag.node = nodeData;
+                state.drag.ghostEl = floatEl;
+                state.drag.offsetX = e.clientX - floatRect.left;
+                state.drag.offsetY = e.clientY - floatRect.top;
+                state.drag.activeTargetId = null;
+                state.drag.activeZone = null;
+                
+                document.body.classList.add('is-dragging');
+                document.addEventListener('keydown', onDragKey);
+                document.addEventListener('keyup', onDragKey);
+
+                if (e.shiftKey) {
+                    floatEl.classList.add('ghost-snap-mode');
+                    document.body.classList.add('snap-active');
+                } else {
+                    floatEl.classList.add('window-lifted');
+                }
+
+                return true;
+            }
+
+            function updateGhostPosition(x, y) {
+                if (!state.drag.ghostEl) return;
+                const rect = document.getElementById('ui-workspace-main').getBoundingClientRect();
+                
+                let newX = x - state.drag.offsetX - rect.left;
+                let newY = y - state.drag.offsetY - rect.top;
+                
+                state.drag.node.x = newX;
+                state.drag.node.y = newY;
+                
+                // Direct DOM update for 60fps dragging
+                state.drag.ghostEl.style.left = `${newX}px`;
+                state.drag.ghostEl.style.top = `${newY}px`;
+            }
+
+            function onDragMove(e) {
+                // Initialize drag if mouse moves beyond 5px threshold (prevents detachment on click)
+                if (!state.drag.isDragging) {
+                    const dist = Math.hypot(e.clientX - state.drag.startX, e.clientY - state.drag.startY);
+                    if (dist > 5) {
+                        if (performDetachment(e)) {
+                            state.drag.isDragging = true;
+                        } else {
+                            cleanupDrag();
+                            return;
+                        }
+                    } else {
+                        return;
+                    }
+                }
+
+                state.drag.lastX = e.clientX;
+                state.drag.lastY = e.clientY;
+
+                if (!e.isMock) {
+                    updateGhostPosition(e.clientX, e.clientY);
+                }
+
+                const overlay = document.getElementById('ui-drop-overlay');
+
+                if (e.shiftKey) {
+                    state.drag.ghostEl.classList.add('ghost-snap-mode');
+                    state.drag.ghostEl.classList.remove('window-lifted');
+                    document.body.classList.add('snap-active');
+
+                    // Temporarily hide floating window to find target underneath
+                    const origDisplay = state.drag.ghostEl.style.display;
+                    state.drag.ghostEl.style.display = 'none';
+                    const elements = document.elementsFromPoint(e.clientX, e.clientY);
+                    state.drag.ghostEl.style.display = origDisplay;
+
+                    const targetEl = elements.find(el => el.classList.contains('drop-target') && el.dataset.id !== state.drag.originalId && el.dataset.id !== 'root-empty');
+                    const targetIsEmptyRoot = elements.find(el => el.dataset.id === 'root-empty');
+
+                    if (targetEl || targetIsEmptyRoot) {
+                        const activeTarget = targetEl ? targetEl : targetIsEmptyRoot;
+                        const rect = activeTarget.getBoundingClientRect();
+                        const x = e.clientX;
+                        const y = e.clientY;
+                        
+                        const distLeft = Math.abs(x - rect.left);
+                        const distRight = Math.abs(x - rect.right);
+                        const distTop = Math.abs(y - rect.top);
+                        const distBottom = Math.abs(y - rect.bottom);
+                        
+                        const minEdgeDist = Math.min(distLeft, distRight, distTop, distBottom);
+                        const SNAP_THRESHOLD = 40; // Pixels
+
+                        let zone = 'center'; 
+
+                        if (targetIsEmptyRoot) {
+                            zone = 'center';
+                        } else if (minEdgeDist < SNAP_THRESHOLD) {
+                            if (minEdgeDist === distLeft) zone = 'left';
+                            else if (minEdgeDist === distRight) zone = 'right';
+                            else if (minEdgeDist === distTop) zone = 'top';
+                            else if (minEdgeDist === distBottom) zone = 'bottom';
+                        } else {
+                            const relX = x - rect.left;
+                            const relY = y - rect.top;
+                            const w = rect.width;
+                            const h = rect.height;
+                            const threshold = 0.25;
+
+                            if (relX < w * threshold) zone = 'left';
+                            else if (relX > w * (1 - threshold)) zone = 'right';
+                            else if (relY < h * threshold) zone = 'top';
+                            else if (relY > h * (1 - threshold)) zone = 'bottom';
+                        }
+
+                        state.drag.activeTargetId = activeTarget.dataset.id;
+                        state.drag.activeZone = zone;
+
+                        // Update visual overlay
+                        let oTop = rect.top, oLeft = rect.left, oWidth = rect.width, oHeight = rect.height;
+                        
+                        if (zone === 'left') oWidth /= 2;
+                        if (zone === 'right') { oLeft += oWidth/2; oWidth /= 2; }
+                        if (zone === 'top') oHeight /= 2;
+                        if (zone === 'bottom') { oTop += oHeight/2; oHeight /= 2; }
+                        if (zone === 'center' && !targetIsEmptyRoot) { oTop += 10; oLeft += 10; oWidth -= 20; oHeight -= 20; }
+
+                        overlay.style.top = `${oTop}px`;
+                        overlay.style.left = `${oLeft}px`;
+                        overlay.style.width = `${oWidth}px`;
+                        overlay.style.height = `${oHeight}px`;
+                        overlay.style.display = 'block';
+                    } else {
+                        state.drag.activeTargetId = null;
+                        state.drag.activeZone = null;
+                        overlay.style.display = 'none';
+                    }
+                } else {
+                    state.drag.ghostEl.classList.remove('ghost-snap-mode');
+                    state.drag.ghostEl.classList.add('window-lifted');
+                    document.body.classList.remove('snap-active');
+                    state.drag.activeTargetId = null;
+                    state.drag.activeZone = null;
+                    overlay.style.display = 'none';
+                }
+            }
+
+            function onDragEnd(e) {
+                if (!state.drag.isDragging) {
+                    cleanupDrag();
+                    return; // Was just a click
+                }
+                
+                const ws = getWorkspace();
+                const { originalId, node, activeTargetId, activeZone } = state.drag;
+
+                cleanupDrag();
+
+                if (activeTargetId && activeZone) {
+                    // Snapped into tree! Remove from floating windows array
+                    ws.floatingWindows = ws.floatingWindows.filter(w => w.id !== originalId);
+                    
+                    const insertNode = node.type === 'window' ? node : { id: node.id, type: 'window', title: node.title, content: node.content };
+                    
+                    if (activeTargetId === 'root-empty' || !ws.rootNode) {
+                        ws.rootNode = insertNode; 
+                    } else {
+                        ws.rootNode = insertNodeIntoTree(ws.rootNode, activeTargetId, insertNode, activeZone);
+                    }
+                } 
+                // If not snapped (or Shift wasn't held), it naturally stays in ws.floatingWindows!
+
+                render();
+            }
+
+            function onDragKey(e) {
+                if (e.key === 'Escape' && e.type === 'keydown') {
+                    cleanupDrag();
+                    render(); // Cancels snap, leaves window floating safely
+                    return;
+                }
+                if (e.key === 'Shift') {
+                    // Re-trigger layout calculation based on shift state without moving mouse
+                    onDragMove({ 
+                        clientX: state.drag.lastX, 
+                        clientY: state.drag.lastY, 
+                        shiftKey: e.type === 'keydown',
+                        isMock: true 
+                    });
+                }
+            }
+
+            function cleanupDrag() {
+                if (state.drag.ghostEl) {
+                    state.drag.ghostEl.classList.remove('ghost-snap-mode', 'window-lifted');
+                }
+                document.getElementById('ui-drop-overlay').style.display = 'none';
+                document.body.classList.remove('is-dragging', 'snap-active');
+                document.removeEventListener('mousemove', onDragMove);
+                document.removeEventListener('mouseup', onDragEnd);
+                document.removeEventListener('keydown', onDragKey);
+                document.removeEventListener('keyup', onDragKey);
+                state.drag.isDragging = false;
+            }
+
+            // --- Floating Window Resize Logic ---
+            function startResize(e, id) {
+                e.stopPropagation();
+                const ws = getWorkspace();
+                const win = ws.floatingWindows.find(w => w.id === id);
+                if(!win) return;
+
+                state.splitResize = {
+                    isResizing: true, type: 'floating',
+                    node: win, startX: e.clientX, startY: e.clientY,
+                    startW: win.w, startH: win.h
+                };
+                
+                document.body.classList.add('is-dragging');
+                document.addEventListener('mousemove', onResizeMove);
+                document.addEventListener('mouseup', onResizeEnd);
+            }
+
+            function onResizeMove(e) {
+                if(!state.splitResize.isResizing) return;
+                if(state.splitResize.type === 'floating') {
+                    const { node, startX, startY, startW, startH } = state.splitResize;
+                    node.w = Math.max(200, startW + (e.clientX - startX));
+                    node.h = Math.max(100, startH + (e.clientY - startY));
+                    
+                    // Direct DOM update for performance
+                    const el = document.getElementById(`float-${node.id}`);
+                    if(el) { el.style.width = `${node.w}px`; el.style.height = `${node.height}px`; }
+                    render(); // Call render to ensure state is fully synced, acceptable in this optimized scope
+                } else {
+                    // Split pane resizing
+                    const { node, index, startX, startY, startRatio, isHoriz, totalSize } = state.splitResize;
+                    const delta = isHoriz ? (e.clientX - startX) : (e.clientY - startY);
+                    const deltaRatio = delta / totalSize;
+                    let newRatio = startRatio + deltaRatio;
+                    newRatio = Math.max(0.1, Math.min(0.9, newRatio)); // Limit to 10%-90%
+                    node.ratio = newRatio;
+                    render();
+                }
+            }
+
+            function onResizeEnd() {
+                state.splitResize.isResizing = false;
+                document.body.classList.remove('is-dragging');
+                document.removeEventListener('mousemove', onResizeMove);
+                document.removeEventListener('mouseup', onResizeEnd);
+            }
+
+            function startSplitResize(e, splitId, isHoriz) {
+                e.preventDefault();
+                const ws = getWorkspace();
+                const splitNode = findNode(ws.rootNode, splitId);
+                if(!splitNode) return;
+
+                const parentRect = e.target.parentElement.getBoundingClientRect();
+                const totalSize = isHoriz ? parentRect.width : parentRect.height;
+
+                state.splitResize = {
+                    isResizing: true, type: 'split',
+                    node: splitNode, isHoriz, totalSize,
+                    startX: e.clientX, startY: e.clientY,
+                    startRatio: splitNode.ratio || 0.5
+                };
+
+                document.body.classList.add('is-dragging');
+                document.addEventListener('mousemove', onResizeMove);
+                document.addEventListener('mouseup', onResizeEnd);
+            }
+
+            // --- Rendering Engine ---
+
+            const Icons = {
+                close: `<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>`,
+                min: `<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/></svg>`,
+                max: `<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>`,
+                pop: `<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>`
+            };
+
+            function renderHeader(node, isFloating) {
+                return `
+                    <div data-element="window-header" class="h-12 flex items-center justify-between px-5 shrink-0 cursor-grab active:cursor-grabbing select-none" 
+                         onmousedown="System.startDrag(event, '${node.id}', ${isFloating})"
+                         ondblclick="System.performWindowAction('${node.id}', 'maximize', event)">
+                        <div data-element="window-title" class="text-sm font-bold text-[var(--primary)] truncate pointer-events-none">${node.title || 'Untitled'}</div>
+                        <div data-element="window-controls" class="window-controls flex items-center gap-3 text-[var(--text)] z-10 opacity-60 hover:opacity-100 transition-opacity">
+                            <button data-element="btn-popout" class="hover:text-[var(--accent)] transition-colors" onclick="System.performWindowAction('${node.id}', 'popout', event)" title="Pop out">${Icons.pop}</button>
+                            <button data-element="btn-minimize" class="hover:text-[var(--accent)] transition-colors" onclick="System.performWindowAction('${node.id}', 'minimize', event)" title="Minimize">${Icons.min}</button>
+                            <button data-element="btn-maximize" class="hover:text-[var(--accent)] transition-colors" onclick="System.performWindowAction('${node.id}', 'maximize', event)" title="Maximize">${Icons.max}</button>
+                            <button data-element="btn-close" class="hover:text-red-700 transition-colors" onclick="System.performWindowAction('${node.id}', 'close', event)" title="Close">${Icons.close}</button>
+                        </div>
+                    </div>
+                `;
+            }
+
+            function renderTree(node) {
+                if (!node) return `<div data-element="empty-state" class="w-full h-full flex flex-col items-center justify-center drop-target opacity-50" data-id="root-empty">
+                    <svg class="w-16 h-16 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                    <p class="font-bold text-xl">Workspace Empty</p><p class="text-sm mt-2 font-medium">Drag a window here or click 'New Window'</p>
+                </div>`;
+
+                if (node.type === 'split') {
+                    const isHoriz = node.direction === 'horizontal';
+                    const ratio = node.ratio || 0.5;
+                    
+                    return `
+                        <div data-element="split-container" class="flex ${isHoriz ? 'flex-row' : 'flex-col'} w-full h-full" data-id="${node.id}">
+                            <div data-element="split-pane-1" class="relative spring-transition" style="${isHoriz ? `width: ${ratio * 100}%` : `height: ${ratio * 100}%`}">${renderTree(node.children[0])}</div>
+                            <div data-element="${isHoriz ? 'splitter-vertical' : 'splitter-horizontal'}" class="${isHoriz ? 'split-resizer-v' : 'split-resizer-h'} shrink-0" onmousedown="System.startSplitResize(event, '${node.id}', ${isHoriz})"></div>
+                            <div data-element="split-pane-2" class="relative spring-transition flex-1">${renderTree(node.children[1])}</div>
+                        </div>
+                    `;
+                }
+
+                if (node.type === 'tabGroup') {
+                    const activeChild = node.children.find(c => c.id === node.activeTabId) || node.children[0];
+                    return `
+                        <div data-element="tab-group-container" class="window-card w-full h-full drop-target" data-id="${node.id}">
+                            <div data-element="tab-strip" class="flex overflow-x-auto shrink-0 px-4 pt-4 gap-3 pb-2 relative z-10">
+                                ${node.children.map(c => `
+                                    <div data-element="tab-item" class="btn text-sm py-1.5 px-4 flex items-center gap-2 select-none cursor-grab ${c.id === activeChild.id ? 'active-tab' : ''}"
+                                        onclick="System.setActiveTab('${node.id}', '${c.id}')"
+                                        onmousedown="System.startDrag(event, '${c.id}', false)">
+                                        <span class="truncate max-w-[120px] pointer-events-none">${c.title}</span>
+                                        <button data-element="btn-close-tab" onclick="System.performWindowAction('${c.id}', 'close', event)" class="hover:text-red-700 transition-colors pointer-events-auto ml-1">
+                                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                        </button>
+                                    </div>
+                                `).join('')}
+                            </div>
+                            <div class="px-3 pb-3 flex-1 flex flex-col min-h-0">
+                                <div data-element="tab-content-area" class="nm-inner flex-1 relative p-4 overflow-auto">
+                                    <div class="drag-shield"></div>
+                                    ${activeChild.content || ''}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                if (node.type === 'window') {
+                    return `
+                        <div data-element="window-container" class="window-card w-full h-full drop-target" data-id="${node.id}">
+                            ${renderHeader(node, false)}
+                            <div class="px-3 pb-3 flex-1 flex flex-col min-h-0">
+                                <div data-element="window-content" class="nm-inner flex-1 relative p-4 overflow-auto">
+                                    <div class="drag-shield"></div>
+                                    ${node.content || ''}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+
+            function renderFloating(windows) {
+                return windows.map(win => `
+                    <div id="float-${win.id}" data-element="floating-window" class="absolute flex flex-col window-card drop-target"
+                         style="left: ${win.x}px; top: ${win.y}px; width: ${win.w}px; height: ${win.h}px; z-index: 30;"
+                         data-id="${win.id}"
+                         onmousedown="System.bringToFront('${win.id}')">
+                        ${renderHeader(win, true)}
+                        <div class="px-3 pb-3 flex-1 flex flex-col min-h-0">
+                            <div data-element="window-content" class="nm-inner flex-1 relative p-4 overflow-auto">
+                                <div class="drag-shield"></div>
+                                ${win.content || ''}
+                            </div>
+                        </div>
+                        <div data-element="resize-handle" class="resize-handle" onmousedown="System.startResize(event, '${win.id}')">
+                            <svg class="w-full h-full" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            function render() {
+                // Topbar / Workspaces
+                const tabsHtml = state.workspaces.map(ws => `
+                    <button data-element="workspace-tab" onclick="System.switchWorkspace('${ws.id}')" 
+                            class="btn text-sm ${ws.id === state.activeWorkspaceId ? 'active-tab' : ''}">
+                        ${ws.name}
+                    </button>
+                `).join('');
+                document.getElementById('ui-workspace-tabs-container').innerHTML = tabsHtml + `
+                    <button id="ui-btn-add-workspace" onclick="System.addWorkspace()" class="btn px-2 py-2 ml-2" title="Add Workspace">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                    </button>
+                `;
+
+                // Dock
+                const dockEl = document.getElementById('ui-dock-container');
+                if(state.minimizedWindows.length > 0) {
+                    dockEl.classList.remove('hidden');
+                    dockEl.innerHTML = `<span class="text-xs font-bold mr-2 text-[var(--primary)] opacity-70">DOCK</span>` + state.minimizedWindows.map(w => `
+                        <button data-element="dock-item" onclick="System.performWindowAction('${w.id}', 'restore')" class="btn text-xs py-1 px-3 truncate max-w-[120px] animate-pop" title="${w.title}">
+                            ${w.title}
+                        </button>
+                    `).join('');
+                } else {
+                    dockEl.classList.add('hidden');
+                }
+
+                // Main Area
+                const container = document.getElementById('ui-workspace-main');
+                const ws = getWorkspace();
+
+                if (ws.maximizedNode) {
+                    const node = findNode(ws.rootNode, ws.maximizedNode) || ws.floatingWindows.find(w => w.id === ws.maximizedNode);
+                    if(node) {
+                        container.innerHTML = `<div class="w-full h-full z-40 absolute inset-0 p-4 bg-[var(--bg)]">${renderTree(node)}</div>`;
+                        return;
+                    }
+                }
+
+                let html = renderTree(ws.rootNode);
+                html += renderFloating(ws.floatingWindows);
+                container.innerHTML = html;
+            }
+
+            // --- Public API ---
+            return {
+                init: () => render(),
+                startDrag,
+                startResize,
+                startSplitResize,
+                performWindowAction,
+                setActiveTab: (groupId, tabId) => {
+                    const ws = getWorkspace();
+                    const group = findNode(ws.rootNode, groupId);
+                    if (group) { group.activeTabId = tabId; render(); }
+                },
+                switchWorkspace: (id) => {
+                    state.activeWorkspaceId = id;
+                    render();
+                },
+                addWorkspace: () => {
+                    const id = uid();
+                    state.workspaces.push({ id, name: `Workspace ${state.workspaces.length + 1}`, rootNode: null, floatingWindows: [], maximizedNode: null });
+                    state.activeWorkspaceId = id;
+                    render();
+                },
+                addRandomWindow: () => {
+                    const titles = ['System Logs', 'Database Query', 'Graph View', 'Chat', 'Inspector'];
+                    const win = {
+                        id: uid(), type: 'window', 
+                        title: titles[Math.floor(Math.random() * titles.length)], 
+                        content: `<div class="p-4 opacity-80 font-medium">Content for newly spawned window. Drag me anywhere.</div>`
+                    };
+                    const ws = getWorkspace();
+                    
+                    if(!ws.rootNode) {
+                        ws.rootNode = win;
+                    } else {
+                        // Spawn as floating in center
+                        const rect = document.getElementById('ui-workspace-main').getBoundingClientRect();
+                        win.x = rect.width / 2 - 200 + (Math.random()*40-20);
+                        win.y = rect.height / 2 - 150 + (Math.random()*40-20);
+                        win.w = 400; win.h = 300;
+                        ws.floatingWindows.push(win);
+                    }
+                    render();
+                },
+                bringToFront: (id) => {
+                    const ws = getWorkspace();
+                    const idx = ws.floatingWindows.findIndex(w => w.id === id);
+                    if(idx > -1) {
+                        const w = ws.floatingWindows.splice(idx, 1)[0];
+                        ws.floatingWindows.push(w);
+                        render();
+                    }
+                }
+            };
+        })();
+
+        // Boot
+        document.addEventListener('DOMContentLoaded', () => {
+            System.init();
+        });
+    </script>
+</body>
+</html>
