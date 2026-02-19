@@ -1,35 +1,543 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Page Title</title>
-    <link rel="stylesheet" href="css/style.css">
+    <title>Forest Whispers - Lofi Voice Chat</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <script src="https://www.youtube.com/iframe_api"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600;700&family=Lora:ital,wght@0,400;0,700;1,400&display=swap');
+        
+        :root {
+            --woods-moss: #4A5D4E;
+            --woods-bark: #3E362E;
+            --woods-fog: #E8EBE4;
+            --woods-paper: #FDFBF7;
+            --woods-leaf: #A3B18A;
+            --woods-clay: #D4A373;
+            --woods-shadow: rgba(62, 54, 46, 0.1);
+        }
+
+        body { 
+            font-family: 'Quicksand', sans-serif; 
+            background-color: var(--woods-fog); 
+            color: var(--woods-bark);
+            margin: 0;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        h1, h2, h3, .serif { font-family: 'Lora', serif; }
+
+        /* Wireframe Styles */
+        .top-shelf {
+            background: #8A8A8A;
+            border-radius: 1.5rem;
+            color: white;
+            padding: 1rem;
+            text-align: center;
+        }
+
+        .shelf-item {
+            background: #B5B5B5;
+            border-radius: 1rem;
+            width: 60px;
+            height: 60px;
+            margin: 0 auto;
+            border-bottom: 4px solid #999;
+            cursor: pointer;
+            transition: transform 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+        .shelf-item:hover { transform: scale(1.05); }
+
+        .chat-room-card {
+            background: #E0E0E0;
+            border-radius: 1.5rem;
+            padding: 1rem;
+            width: 100%;
+            min-height: 200px;
+            transition: all 0.3s;
+        }
+
+        .peer-pill {
+            background: white;
+            border-radius: 1rem;
+            padding: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+            border: 2px solid transparent;
+        }
+
+        .peer-pill.speaking {
+            border-color: #A3B18A;
+            box-shadow: 0 0 10px rgba(163, 177, 138, 0.5);
+        }
+
+        .peer-pill .avatar {
+            width: 32px;
+            height: 32px;
+            background: #B5B5B5;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+
+        .widget-area {
+            background: white;
+            border: 2px solid #E0E0E0;
+            border-radius: 2rem;
+            flex: 1;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .bottom-dock {
+            background: #8A8A8A;
+            height: 80px;
+            border-radius: 40px 40px 0 0;
+            padding: 0 2rem;
+            display: flex;
+            align-items: center;
+            color: white;
+            gap: 2rem;
+        }
+
+        .dock-btn {
+            width: 44px;
+            height: 44px;
+            background: #B5B5B5;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .dock-btn:hover { background: #999; }
+        .dock-btn.active { background: #4A5D4E; }
+        .dock-btn.danger { background: #EF4444; }
+
+        .divider-line {
+            display: flex;
+            align-items: center;
+            text-align: center;
+            color: #999;
+            font-size: 0.75rem;
+            margin: 1rem 0;
+        }
+        .divider-line::before, .divider-line::after {
+            content: '';
+            flex: 1;
+            border-bottom: 1px solid #CCC;
+        }
+        .divider-line:not(:empty)::before { margin-right: .5em; }
+        .divider-line:not(:empty)::after { margin-left: .5em; }
+
+        .yt-hidden { position: absolute; left: -9999px; }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #CCC; border-radius: 10px; }
+    </style>
 </head>
-<script type="module">
-  import {joinRoom} from './scripts/trystero-mqtt.min.js'
-  
-    const config = {appId: 'A Happy Tree'}
-    const room = joinRoom(config, 'Field')
+<body class="p-6">
 
-    room.onPeerJoin(peerId => console.log(`${peerId} joined`));
+    <!-- Setup View Overlay -->
+    <div id="setup-view" class="fixed inset-0 z-[1000] flex items-center justify-center bg-[--woods-fog]">
+        <div class="w-full max-w-md text-center space-y-8 p-6">
+            <h2 class="text-5xl font-bold text-[--woods-bark] serif">Forest Whispers</h2>
+            <div class="bg-white rounded-3xl p-8 shadow-xl space-y-6">
+                <input id="setup-username-input" type="text" placeholder="Your name..." class="w-full border-2 border-[#A3B18A] rounded-xl p-3 text-center focus:outline-none focus:ring-2 focus:ring-[#A3B18A]">
+                <div class="grid grid-cols-2 gap-4">
+                    <button onclick="handleHost()" class="bg-[#4A5D4E] text-white py-3 rounded-full font-bold hover:bg-[#3E362E] transition-colors">Host Room</button>
+                    <button onclick="showJoinInput()" class="bg-[#A3B18A] text-white py-3 rounded-full font-bold hover:bg-[#8A9672] transition-colors">Join Room</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
-    room.onPeerLeave(peerId => console.log(`${peerId} left`));
+    <!-- Main Application UI -->
+    <div id="lobby-view" class="hidden h-full flex flex-col space-y-4 animate-in fade-in duration-500">
+        
+        <!-- Top Shelf -->
+        <div class="grid grid-cols-12 gap-4">
+            <div class="col-span-4 top-shelf">
+                <p class="text-[10px] uppercase font-bold tracking-widest mb-3 opacity-80">Room Management</p>
+                <div class="flex justify-between px-4">
+                    <div class="shelf-item" onclick="copyInvite()" title="Copy Invite ID">🔗</div>
+                    <div class="shelf-item" onclick="location.reload()" title="New Room">🏠</div>
+                    <div class="shelf-item" style="opacity: 0.3"></div>
+                    <div class="shelf-item" style="opacity: 0.3"></div>
+                </div>
+            </div>
+            <div class="col-span-4 top-shelf flex flex-col justify-between">
+                <p class="text-[10px] uppercase font-bold tracking-widest opacity-80">Media Preview</p>
+                <div class="px-4">
+                    <div id="media-status" class="text-[10px] truncate opacity-60 mb-1 italic">Silent Grove...</div>
+                    <div class="w-full h-1.5 bg-[#B5B5B5] rounded-full overflow-hidden">
+                        <div id="media-progress" class="h-full bg-white w-0 transition-all duration-1000"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-span-4 top-shelf">
+                <p class="text-[10px] uppercase font-bold tracking-widest mb-3 opacity-80">Widgets Menu</p>
+                <div class="flex justify-between px-4">
+                    <div class="shelf-item !rounded-2xl" onclick="switchWidget('chat')" title="Chat">💬</div>
+                    <div class="shelf-item !rounded-2xl" onclick="switchWidget('peers')" title="Room Info">👥</div>
+                    <div class="shelf-item !rounded-2xl" onclick="switchWidget('settings')" title="Music Settings">🎵</div>
+                    <div class="shelf-item !rounded-2xl" onclick="switchWidget('plus')" title="Add More">＋</div>
+                </div>
+            </div>
+        </div>
 
-    import {selfId} from './scripts/trystero-mqtt.min.js'
+        <div class="divider-line">the clearing</div>
 
-    console.log(`my peer ID is ${selfId}`)
+        <!-- Main Workspace -->
+        <div class="flex-1 flex gap-6 min-h-0">
+            <!-- Left Sidebar: Active Chat Room -->
+            <div class="w-72 flex flex-col gap-4 overflow-hidden">
+                <div class="chat-room-card flex flex-col h-full">
+                    <div class="w-12 h-1 bg-[#B5B5B5] rounded-full mx-auto mb-4 flex-shrink-0"></div>
+                    <p id="room-title-display" class="text-[10px] font-bold text-[#999] uppercase mb-4 flex-shrink-0">Chat Room 1</p>
+                    <div id="peer-list-container" class="flex-1 overflow-y-auto pr-2">
+                        <!-- User Pills populate here -->
+                        <div id="local-peer-pill" class="peer-pill">
+                            <div class="avatar" id="local-avatar">Y</div>
+                            <div class="flex flex-col">
+                                <span class="text-xs font-bold text-[#666]" id="local-name-display">You</span>
+                                <span class="text-[9px] opacity-50 uppercase">Local</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-    const stream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
-        video: false
-    })
-    room.addStream(stream)
+            <!-- Right Workspace: Dynamic Widgets -->
+            <div class="flex-1 flex flex-col">
+                <div class="widget-area" id="active-widget">
+                    <!-- Default State -->
+                    <div class="flex flex-col items-center justify-center h-full text-[#B5B5B5]">
+                        <div class="flex items-center gap-4">
+                            <span class="text-6xl">+</span>
+                            <span>select a widget</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-    //room.leave()
-</script>
-<body>
-    <h1>Hello, World!</h1>
+        <!-- Bottom Controls -->
+        <div class="bottom-dock">
+            <div class="flex items-center gap-2">
+                <span class="text-xs font-bold opacity-70" id="dock-room-label">ROOM: ----</span>
+                <span class="text-[8px] transform rotate-180">▲</span>
+            </div>
+            <div class="flex gap-3">
+                <div id="mute-btn" class="dock-btn" onclick="toggleMute()" title="Mute/Unmute">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path></svg>
+                </div>
+                <div id="deafen-btn" class="dock-btn" onclick="toggleDeafen()" title="Deafen">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 5L6 9H2v6h4l5 4V5z"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+                </div>
+                <div class="dock-btn" onclick="switchWidget('settings')" title="Music">📻</div>
+                <div class="dock-btn danger" onclick="location.reload()" title="Leave Room">✕</div>
+            </div>
+            <div class="flex-1 text-right">
+                <div id="media-title-dock" class="font-bold tracking-widest text-xs opacity-80 truncate">MEDIA PLAYER IDLE</div>
+                <div class="text-[9px] opacity-40 uppercase tracking-tighter">Synchronized Audio</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="youtube-anchor" class="yt-hidden"></div>
+
+    <script>
+        // --- State Management ---
+        let peer = null;
+        let localStream = null;
+        let isMuted = false;
+        let isDeafened = false;
+        let connections = {};
+        let myName = "Spirit";
+        let ytPlayer = null;
+        let currentWidget = 'plus';
+
+        // --- YouTube API ---
+        function onYouTubeIframeAPIReady() {
+            ytPlayer = new YT.Player('youtube-anchor', {
+                height: '0', width: '0', videoId: 'jfKfPfyJRdk',
+                playerVars: { 'autoplay': 1, 'controls': 0, 'enablejsapi': 1 },
+                events: { 
+                    'onReady': (e) => {
+                        e.target.setVolume(40);
+                        updateMediaUI();
+                    },
+                    'onStateChange': (e) => updateMediaUI()
+                }
+            });
+            setInterval(updateMediaProgress, 1000);
+        }
+
+        function updateMediaUI() {
+            if (!ytPlayer || !ytPlayer.getVideoData) return;
+            const data = ytPlayer.getVideoData();
+            const title = data.title || "Silent Grove";
+            document.getElementById('media-status').innerText = title;
+            document.getElementById('media-title-dock').innerText = title.toUpperCase();
+        }
+
+        function updateMediaProgress() {
+            if (!ytPlayer || ytPlayer.getPlayerState?.() !== 1) return;
+            const duration = ytPlayer.getDuration();
+            const current = ytPlayer.getCurrentTime();
+            if (duration > 0) {
+                const perc = (current / duration) * 100;
+                document.getElementById('media-progress').style.width = perc + "%";
+            }
+        }
+
+        // --- P2P Logic ---
+        async function handleHost() {
+            myName = document.getElementById('setup-username-input').value.trim() || 'Host';
+            await requestMedia();
+            const id = Math.random().toString(36).substring(2, 8).toUpperCase();
+            initPeer(id);
+            enterLobby();
+        }
+
+        function showJoinInput() {
+            const id = prompt("Enter Room ID:");
+            if (!id) return;
+            myName = document.getElementById('setup-username-input').value.trim() || 'Guest';
+            requestMedia().then(() => {
+                initPeer();
+                peer.on('open', () => {
+                    const conn = peer.connect(id.toUpperCase(), { metadata: { name: myName } });
+                    setupConn(conn);
+                    peer.call(id.toUpperCase(), localStream);
+                    enterLobby();
+                });
+            });
+        }
+
+        async function requestMedia() {
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({ 
+                    audio: { echoCancellation: true, noiseSuppression: true } 
+                });
+            } catch (err) {
+                console.error("Mic access denied", err);
+                alert("Microphone access is required for voice chat.");
+            }
+        }
+
+        function initPeer(id = null) {
+            peer = id ? new Peer(id) : new Peer();
+            
+            peer.on('open', (id) => {
+                document.getElementById('dock-room-label').innerText = `ROOM: ${id}`;
+                document.getElementById('room-title-display').innerText = `CLEARING: ${id}`;
+            });
+
+            peer.on('connection', setupConn);
+
+            peer.on('call', (call) => {
+                call.answer(localStream);
+                call.on('stream', (remoteStream) => {
+                    const audio = new Audio();
+                    audio.srcObject = remoteStream;
+                    audio.dataset.peerId = call.peer;
+                    audio.play();
+                    addPeerToUI(call.peer, call.metadata?.name || "Spirit");
+                });
+            });
+        }
+
+        function setupConn(conn) {
+            connections[conn.peer] = conn;
+            conn.on('open', () => {
+                addPeerToUI(conn.peer, conn.metadata?.name || "Spirit");
+            });
+            conn.on('data', (data) => {
+                if (data.type === 'chat') handleIncomingChat(data);
+                if (data.type === 'sync-music') handleMusicSync(data);
+            });
+        }
+
+        function enterLobby() {
+            document.getElementById('setup-view').classList.add('hidden');
+            document.getElementById('lobby-view').classList.remove('hidden');
+            document.getElementById('local-name-display').innerText = myName;
+            document.getElementById('local-avatar').innerText = myName[0].toUpperCase();
+            switchWidget('chat');
+        }
+
+        // --- UI Interactions ---
+        function addPeerToUI(id, name) {
+            if (document.getElementById(`peer-${id}`)) return;
+            const container = document.getElementById('peer-list-container');
+            const isRight = container.children.length % 2 === 0;
+            
+            const pill = document.createElement('div');
+            pill.id = `peer-${id}`;
+            pill.className = `peer-pill animate-in slide-in-from-left-2 ${isRight ? 'flex-row-reverse text-right' : ''}`;
+            pill.innerHTML = `
+                <div class="avatar">${name[0].toUpperCase()}</div>
+                <div class="flex flex-col">
+                    <span class="text-xs font-bold text-[#666]">${name}</span>
+                    <span class="text-[9px] opacity-40 uppercase">Connected</span>
+                </div>
+            `;
+            container.appendChild(pill);
+        }
+
+        function toggleMute() {
+            isMuted = !isMuted;
+            if (localStream) localStream.getAudioTracks()[0].enabled = !isMuted;
+            document.getElementById('mute-btn').classList.toggle('danger', isMuted);
+        }
+
+        function toggleDeafen() {
+            isDeafened = !isDeafened;
+            document.querySelectorAll('audio').forEach(a => a.muted = isDeafened);
+            document.getElementById('deafen-btn').classList.toggle('danger', isDeafened);
+        }
+
+        function copyInvite() {
+            if (!peer || !peer.id) return;
+            navigator.clipboard.writeText(peer.id);
+            const btn = document.querySelector('[onclick="copyInvite()"]');
+            const old = btn.innerText;
+            btn.innerText = "✓";
+            setTimeout(() => btn.innerText = old, 2000);
+        }
+
+        // --- Widgets ---
+        function switchWidget(type) {
+            const container = document.getElementById('active-widget');
+            currentWidget = type;
+            
+            switch(type) {
+                case 'chat':
+                    container.innerHTML = `
+                        <div class="flex flex-col h-full">
+                            <h3 class="serif text-xl font-bold mb-4">Whispers</h3>
+                            <div id="chat-box" class="flex-1 overflow-y-auto space-y-2 mb-4 pr-2"></div>
+                            <div class="flex gap-2">
+                                <input id="widget-chat-input" type="text" placeholder="Send a message..." class="flex-1 border-2 border-[#E0E0E0] rounded-xl px-4 py-2 text-sm focus:outline-none">
+                                <button onclick="sendChat()" class="bg-[#8A8A8A] text-white px-4 rounded-xl font-bold">></button>
+                            </div>
+                        </div>
+                    `;
+                    document.getElementById('widget-chat-input').addEventListener('keypress', (e) => e.key === 'Enter' && sendChat());
+                    break;
+                case 'peers':
+                    container.innerHTML = `
+                        <div class="h-full flex flex-col">
+                            <h3 class="serif text-xl font-bold mb-4">Clearing Spirits</h3>
+                            <div class="space-y-4">
+                                <div class="p-4 bg-[#F9F9F9] rounded-2xl border border-[#EEE]">
+                                    <p class="text-[10px] uppercase font-bold opacity-40 mb-1">Local Identity</p>
+                                    <p class="font-bold">${myName} (You)</p>
+                                    <p class="text-xs opacity-60">ID: ${peer?.id || '---'}</p>
+                                </div>
+                                <div class="p-4 bg-[#F9F9F9] rounded-2xl border border-[#EEE]">
+                                    <p class="text-[10px] uppercase font-bold opacity-40 mb-1">Active Mesh</p>
+                                    <p class="font-bold">${Object.keys(connections).length + 1} Spirits present</p>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    break;
+                case 'settings':
+                    container.innerHTML = `
+                        <div class="h-full flex flex-col">
+                            <h3 class="serif text-xl font-bold mb-4">Atmosphere Settings</h3>
+                            <div class="space-y-4">
+                                <div class="space-y-1">
+                                    <label class="text-[10px] uppercase font-bold opacity-50">YouTube Video ID</label>
+                                    <div class="flex gap-2">
+                                        <input id="yt-id-input" type="text" placeholder="e.g. jfKfPfyJRdk" class="flex-1 border-2 border-[#E0E0E0] rounded-xl px-4 py-2 text-sm">
+                                        <button onclick="syncMusic()" class="bg-[#4A5D4E] text-white px-4 rounded-xl font-bold text-xs">Sync</button>
+                                    </div>
+                                </div>
+                                <div class="space-y-1">
+                                    <label class="text-[10px] uppercase font-bold opacity-50">Local Volume</label>
+                                    <input type="range" min="0" max="100" value="40" oninput="ytPlayer.setVolume(this.value)" class="w-full">
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    break;
+                default:
+                    container.innerHTML = `
+                        <div class="flex flex-col items-center justify-center h-full text-[#B5B5B5]">
+                            <div class="flex items-center gap-4">
+                                <span class="text-6xl">+</span>
+                                <span>select a widget</span>
+                            </div>
+                        </div>
+                    `;
+            }
+        }
+
+        function sendChat() {
+            const input = document.getElementById('widget-chat-input');
+            const text = input.value.trim();
+            if (!text) return;
+            
+            const msg = { type: 'chat', user: myName, text, time: Date.now() };
+            appendChat(msg, true);
+            Object.values(connections).forEach(c => c.send(msg));
+            input.value = '';
+        }
+
+        function handleIncomingChat(data) {
+            if (currentWidget === 'chat') {
+                appendChat(data, false);
+            }
+        }
+
+        function appendChat(msg, isMe) {
+            const box = document.getElementById('chat-box');
+            if (!box) return;
+            const div = document.createElement('div');
+            div.className = `p-3 rounded-2xl text-sm max-w-[80%] ${isMe ? 'bg-[#4A5D4E] text-white ml-auto rounded-tr-none' : 'bg-[#F0F0F0] rounded-tl-none'}`;
+            div.innerHTML = `<p class="text-[9px] font-bold opacity-50">${msg.user}</p><p>${msg.text}</p>`;
+            box.appendChild(div);
+            box.scrollTop = box.scrollHeight;
+        }
+
+        function syncMusic() {
+            const val = document.getElementById('yt-id-input').value.trim();
+            if (!val) return;
+            const msg = { type: 'sync-music', videoId: val };
+            ytPlayer.loadVideoById(val);
+            Object.values(connections).forEach(c => c.send(msg));
+        }
+
+        function handleMusicSync(data) {
+            if (ytPlayer && data.videoId) {
+                ytPlayer.loadVideoById(data.videoId);
+            }
+        }
+    </script>
 </body>
 </html>
+
