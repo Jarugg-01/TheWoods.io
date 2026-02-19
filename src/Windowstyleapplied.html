@@ -133,12 +133,12 @@
         /* New Drag & Snap Styles */
         .ghost-snap-mode {
             box-shadow: 0 0 0 2px var(--accent), 0 10px 25px color-mix(in srgb, var(--accent) 40%, transparent) !important;
-            opacity: 0.9;
+            opacity: 0 !important;
             transition: box-shadow 0.2s ease, opacity 0.2s ease;
         }
         .window-lifted {
             box-shadow: 25px 25px 50px var(--nm-dark), -15px -15px 30px var(--nm-light) !important;
-            opacity: 0.4; /* Lowered opacity to keep focus on the cursor preview */
+            opacity: 0 !important;
             transform: scale(1.02);
             transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.2), box-shadow 0.2s ease, opacity 0.2s ease;
         }
@@ -198,7 +198,7 @@
 
         body[data-theme="brutal"] .window-lifted {
             box-shadow: 20px 20px 0px var(--text) !important;
-            opacity: 1; /* Remove transparency for brutalist lifted state */
+            opacity: 0 !important;
         }
 
         body[data-theme="brutal"] .ghost-snap-mode {
