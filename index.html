@@ -9,6 +9,17 @@
 </head>
 <script type="module">
   import {joinRoom} from './scripts/trystero-torrent.min.js'
+
+    const config = {appId: 'A Happy Tree'}
+    const room = joinRoom(config, 'Field')
+
+    room.onPeerJoin(peerId => console.log(`${peerId} joined`));
+
+    room.onPeerLeave(peerId => console.log(`${peerId} left`));
+
+    room.leave()
+
+
 </script>
 <body>
     <h1>Hello, World!</h1>
