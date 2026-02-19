@@ -100,12 +100,12 @@
 
         /* Splitters */
         .split-resizer-v { cursor: col-resize; z-index: 10; width: 12px; margin: 0 -6px; background: transparent; position: relative; }
-        .split-resizer-v::after { content: ''; position: absolute; top: 0; bottom: 0; left: 5px; right: 5px; background: color-mix(in srgb, var(--bg), black 10%); border-radius: 4px; transition: background 0.2s; }
-        .split-resizer-v:hover::after, .split-resizer-v.active::after { background: var(--accent); }
+        .split-resizer-v::after { content: ''; position: absolute; top: var(--radius); bottom: var(--radius); left: 5px; right: 5px; background: color-mix(in srgb, var(--bg), black 10%); border-radius: 4px; opacity: 0; transition: opacity 0.2s, background 0.2s; }
+        .split-resizer-v:hover::after, .split-resizer-v.active::after { opacity: 1; background: var(--accent); }
 
         .split-resizer-h { cursor: row-resize; z-index: 10; height: 12px; margin: -6px 0; background: transparent; position: relative; }
-        .split-resizer-h::after { content: ''; position: absolute; left: 0; right: 0; top: 5px; bottom: 5px; background: color-mix(in srgb, var(--bg), black 10%); border-radius: 4px; transition: background 0.2s; }
-        .split-resizer-h:hover::after, .split-resizer-h.active::after { background: var(--accent); }
+        .split-resizer-h::after { content: ''; position: absolute; left: var(--radius); right: var(--radius); top: 5px; bottom: 5px; background: color-mix(in srgb, var(--bg), black 10%); border-radius: 4px; opacity: 0; transition: opacity 0.2s, background 0.2s; }
+        .split-resizer-h:hover::after, .split-resizer-h.active::after { opacity: 1; background: var(--accent); }
 
         /* Drag interactions */
         .drag-shield { display: none; position: absolute; inset: 0; z-index: 50; background: transparent; }
@@ -813,6 +813,9 @@
             }
 
             function onResizeEnd() {
+                if (state.splitResize.resizerEl) {
+                    state.splitResize.resizerEl.classList.remove('active');
+                }
                 state.splitResize.isResizing = false;
                 document.body.classList.remove('is-dragging');
                 document.removeEventListener('mousemove', onResizeMove);
@@ -828,11 +831,14 @@
                 const parentRect = e.target.parentElement.getBoundingClientRect();
                 const totalSize = isHoriz ? parentRect.width : parentRect.height;
 
+                e.target.classList.add('active');
+
                 state.splitResize = {
                     isResizing: true, type: 'split',
                     node: splitNode, isHoriz, totalSize,
                     startX: e.clientX, startY: e.clientY,
-                    startRatio: splitNode.ratio || 0.5
+                    startRatio: splitNode.ratio || 0.5,
+                    resizerEl: e.target
                 };
 
                 document.body.classList.add('is-dragging');
