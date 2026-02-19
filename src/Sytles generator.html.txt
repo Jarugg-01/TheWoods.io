@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Global Styles Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Montserrat:wght@300;400;600;700&family=Playfair+Display:wght@400;700&family=Roboto+Mono&family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #3b82f6;
+            --bg-color: #e0e5ec;
+            --text-color: #2d3436;
+            --accent-color: #ef4444;
+            --font-family: 'Inter', sans-serif;
+            --radius: 20px;
+            
+            /* Adaptive Neomorphic Logic: Mathematically tied to --bg-color */
+            --nm-light: color-mix(in srgb, var(--bg-color), white 45%);
+            --nm-dark: color-mix(in srgb, var(--bg-color), black 18%);
+            --nm-shadow: 10px 10px 20px var(--nm-dark), -10px -10px 20px var(--nm-light);
+            --nm-inset: inset 4px 4px 8px var(--nm-dark), inset -4px -4px 8px var(--nm-light);
+        }
+
+        /* Preview Area Dynamic Styles */
+        #preview-container {
+            font-family: var(--font-family);
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            transition: background-color 0.5s ease;
+        }
+
+        .preview-card {
+            background-color: var(--bg-color);
+            border-radius: var(--radius);
+            padding: 3rem;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        /* Design Philosophies */
+        .style-flat .preview-card {
+            border: 3px solid var(--text-color);
+            box-shadow: 10px 10px 0px var(--text-color);
+        }
+
+        .style-modern .preview-card {
+            border: 1px solid rgba(0,0,0,0.05);
+            box-shadow: 0 15px 35px -5px rgba(0,0,0,0.1), 0 10px 15px -10px rgba(0,0,0,0.05);
+        }
+
+        .style-neomorphism .preview-card {
+            box-shadow: var(--nm-shadow);
+            border: 1px solid color-mix(in srgb, var(--bg-color), white 5%); /* Micro-edge for definition */
+        }
+        
+        .style-neomorphism .preview-card:hover {
+            transform: translateY(-8px);
+            /* Expanding shadows for "lift" effect while staying derived from BG */
+            box-shadow: 18px 18px 35px var(--nm-dark), -18px -18px 35px var(--nm-light);
+        }
+
+        .style-gradient-modern .preview-card {
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
+            backdrop-filter: blur(12px);
+            background: linear-gradient(135deg, rgba(255,255,255,0.7) 0%, rgba(255,255,255,0.3) 100%);
+        }
+
+        /* Buttons in Preview */
+        .preview-btn {
+            padding: 1rem 2rem;
+            border-radius: var(--radius);
+            font-weight: 700;
+            background-color: var(--primary-color);
+            color: white;
+            transition: all 0.3s ease;
+            display: inline-block;
+            border: none;
+            cursor: pointer;
+            outline: none;
+        }
+
+        .style-neomorphism .preview-btn {
+            background-color: var(--bg-color);
+            color: var(--primary-color);
+            box-shadow: 6px 6px 12px var(--nm-dark), -6px -6px 12px var(--nm-light);
+        }
+
+        .style-neomorphism .preview-btn:active {
+            box-shadow: var(--nm-inset);
+            transform: scale(0.97);
+        }
+
+        .style-flat .preview-btn {
+            border: 3px solid var(--text-color);
+            box-shadow: 5px 5px 0px var(--text-color);
+        }
+
+        .style-gradient-modern .preview-btn {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--accent-color) 100%);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg-color); }
+        ::-webkit-scrollbar-thumb { background: var(--nm-dark); border-radius: 10px; }
+    </style>
+</head>
+<body class="bg-slate-100 min-h-screen p-4 md:p-8">
+    <div class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8">
+        
+        <!-- Sidebar Controls -->
+        <div class="lg:col-span-4 space-y-6 bg-white p-7 rounded-[32px] shadow-2xl border border-slate-200 h-fit">
+            <h1 class="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
+                <span class="w-8 h-8 bg-blue-600 rounded-lg inline-block"></span>
+                Style Engine
+            </h1>
+            
+            <!-- Design Philosophy Select -->
+            <div>
+                <label class="block text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-3">Core Philosophy</label>
+                <div class="grid grid-cols-2 gap-2">
+                    <button onclick="setStyle('modern')" class="style-opt py-3 px-1 text-xs border-2 rounded-2xl bg-slate-50 border-transparent text-slate-500 font-bold transition-all" data-style="modern">Modern</button>
+                    <button onclick="setStyle('neomorphism')" class="style-opt py-3 px-1 text-xs border-2 rounded-2xl bg-blue-50 border-blue-500 text-blue-700 font-bold transition-all" data-style="neomorphism">Adaptive Neo</button>
+                    <button onclick="setStyle('flat')" class="style-opt py-3 px-1 text-xs border-2 rounded-2xl bg-slate-50 border-transparent text-slate-500 font-bold transition-all" data-style="flat">Flat Retro</button>
+                    <button onclick="setStyle('gradient-modern')" class="style-opt py-3 px-1 text-xs border-2 rounded-2xl bg-slate-50 border-transparent text-slate-500 font-bold transition-all" data-style="gradient-modern">Vibrant Grad</button>
+                </div>
+            </div>
+
+            <hr class="border-slate-100">
+
+            <!-- Colors -->
+            <div class="space-y-4">
+                <h3 class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Atmosphere</h3>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="space-y-1">
+                        <label class="text-[11px] font-bold text-slate-500">Primary</label>
+                        <input type="color" id="primaryColor" value="#3b82f6" class="w-full h-12 rounded-2xl cursor-pointer border-none p-1 bg-slate-50 shadow-inner">
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-[11px] font-bold text-slate-500">Background</label>
+                        <input type="color" id="bgColor" value="#e0e5ec" class="w-full h-12 rounded-2xl cursor-pointer border-none p-1 bg-slate-50 shadow-inner">
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-[11px] font-bold text-slate-500">Text Ink</label>
+                        <input type="color" id="textColor" value="#2d3436" class="w-full h-12 rounded-2xl cursor-pointer border-none p-1 bg-slate-50 shadow-inner">
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-[11px] font-bold text-slate-500">Accent</label>
+                        <input type="color" id="accentColor" value="#ef4444" class="w-full h-12 rounded-2xl cursor-pointer border-none p-1 bg-slate-50 shadow-inner">
+                    </div>
+                </div>
+            </div>
+
+            <hr class="border-slate-100">
+
+            <!-- Typography & Radii -->
+            <div class="space-y-4">
+                <h3 class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Geometry & Type</h3>
+                <select id="fontFamily" class="w-full p-3 bg-slate-50 border-none rounded-2xl text-sm font-bold text-slate-700 outline-none ring-2 ring-transparent focus:ring-blue-500 transition-all">
+                    <option value="'Inter', sans-serif">Inter (Modern)</option>
+                    <option value="'Montserrat', sans-serif">Montserrat (Geometric)</option>
+                    <option value="'Outfit', sans-serif">Outfit (Minimal)</option>
+                    <option value="'Playfair Display', serif">Playfair (Serif)</option>
+                    <option value="'Roboto Mono', monospace">Roboto (Mono)</option>
+                </select>
+                
+                <div class="px-1">
+                    <div class="flex justify-between text-[11px] font-bold text-slate-500 mb-2">
+                        <span>Corner Radius</span>
+                        <span><span id="radiusVal">20</span>px</span>
+                    </div>
+                    <input type="range" id="radiusRange" min="0" max="50" value="20" class="w-full h-1.5 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-blue-600">
+                </div>
+            </div>
+
+            <button onclick="copyCode()" class="w-full bg-slate-900 text-white py-4 rounded-2xl font-black hover:bg-black transition-all shadow-xl active:scale-[0.98] flex items-center justify-center gap-3 mt-4">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                Deploy System
+            </button>
+        </div>
+
+        <!-- Preview & Output Area -->
+        <div class="lg:col-span-8 space-y-6">
+            
+            <!-- Live Preview -->
+            <div id="preview-container" class="rounded-[48px] border border-slate-200 p-8 md:p-16 min-h-[550px] flex items-center justify-center style-neomorphism overflow-hidden shadow-inner">
+                <div class="preview-card max-w-lg w-full text-center relative">
+                    <div class="inline-block px-4 py-1.5 rounded-full bg-blue-100 text-blue-700 text-[10px] font-black uppercase tracking-widest mb-6" style="background-color: color-mix(in srgb, var(--primary-color), white 85%)">
+                        Visual Preview
+                    </div>
+                    <h2 class="text-4xl md:text-5xl font-black mb-6 tracking-tight leading-tight">Molded Interface</h2>
+                    <p class="mb-10 text-lg opacity-80 font-medium leading-relaxed">
+                        Highlights and shadows are programmatically matched to the background color to maintain the "Soft UI" aesthetic across all luminance levels.
+                    </p>
+                    <div class="flex flex-col sm:flex-row gap-4 justify-center items-center">
+                        <button class="preview-btn">Interactive Press</button>
+                        <button class="px-8 py-3 font-bold border-b-4 transition-all hover:opacity-60" style="border-color: var(--accent-color)">Secondary Link</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Generated Code -->
+            <div class="bg-slate-900 rounded-[32px] p-8 text-slate-300 font-mono text-sm overflow-hidden relative shadow-2xl border border-slate-800">
+                <div class="flex justify-between items-center mb-6 border-b border-slate-800 pb-4">
+                    <span class="text-slate-500 font-bold uppercase tracking-[0.2em] text-[10px]">Production CSS</span>
+                    <span id="copyFeedback" class="text-emerald-400 font-bold opacity-0 transition-opacity">Snippet Copied!</span>
+                </div>
+                <pre id="outputCode" class="overflow-x-auto whitespace-pre-wrap max-h-[350px] scrollbar-thin leading-relaxed text-blue-100/80">
+/* Calculating adaptive neomorphic variables... */
+                </pre>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const root = document.documentElement;
+        const preview = document.getElementById('preview-container');
+        const output = document.getElementById('outputCode');
+        
+        const state = {
+            primary: '#3b82f6',
+            bg: '#e0e5ec',
+            text: '#2d3436',
+            accent: '#ef4444',
+            font: "'Inter', sans-serif",
+            radius: '20px',
+            style: 'neomorphism'
+        };
+
+        const inputs = {
+            primary: document.getElementById('primaryColor'),
+            bg: document.getElementById('bgColor'),
+            text: document.getElementById('textColor'),
+            accent: document.getElementById('accentColor'),
+            font: document.getElementById('fontFamily'),
+            radius: document.getElementById('radiusRange')
+        };
+
+        function updateStyles() {
+            state.primary = inputs.primary.value;
+            state.bg = inputs.bg.value;
+            state.text = inputs.text.value;
+            state.accent = inputs.accent.value;
+            state.font = inputs.font.value;
+            state.radius = inputs.radius.value + 'px';
+            document.getElementById('radiusVal').innerText = inputs.radius.value;
+
+            // Update local CSS Variables
+            root.style.setProperty('--primary-color', state.primary);
+            root.style.setProperty('--bg-color', state.bg);
+            root.style.setProperty('--text-color', state.text);
+            root.style.setProperty('--accent-color', state.accent);
+            root.style.setProperty('--font-family', state.font);
+            root.style.setProperty('--radius', state.radius);
+
+            generateCode();
+        }
+
+        function setStyle(styleName) {
+            state.style = styleName;
+            
+            document.querySelectorAll('.style-opt').forEach(btn => {
+                btn.classList.remove('bg-blue-50', 'border-blue-500', 'text-blue-700');
+                btn.classList.add('bg-slate-50', 'border-transparent', 'text-slate-500');
+                if(btn.dataset.style === styleName) {
+                    btn.classList.remove('bg-slate-50', 'border-transparent', 'text-slate-500');
+                    btn.classList.add('bg-blue-50', 'border-blue-500', 'text-blue-700');
+                }
+            });
+
+            preview.className = `rounded-[48px] border border-slate-200 p-8 md:p-16 min-h-[550px] flex items-center justify-center style-${styleName} overflow-hidden shadow-inner`;
+            
+            generateCode();
+        }
+
+        function generateCode() {
+            let shadows = '';
+            let btnStyles = '';
+            
+            // Neomorphic Specific Formulas (matched strictly to BG)
+            const nmShadow = `10px 10px 20px var(--nm-dark), -10px -10px 20px var(--nm-light)`;
+            const nmHover = `18px 18px 35px var(--nm-dark), -18px -18px 35px var(--nm-light)`;
+
+            if(state.style === 'modern') {
+                shadows = `box-shadow: 0 15px 35px -5px rgba(0,0,0,0.1); border: 1px solid rgba(0,0,0,0.05);`;
+                btnStyles = `background-color: var(--primary); color: white; border: none;`;
+            } else if(state.style === 'flat') {
+                shadows = `border: 3px solid var(--text); box-shadow: 10px 10px 0px var(--text);`;
+                btnStyles = `background-color: var(--primary); color: white; border: 3px solid var(--text); box-shadow: 5px 5px 0px var(--text);`;
+            } else if(state.style === 'neomorphism') {
+                shadows = `box-shadow: ${nmShadow}; border: none; transition: all 0.4s ease;`;
+                btnStyles = `background-color: var(--bg); color: var(--primary); box-shadow: 6px 6px 12px var(--nm-dark), -6px -6px 12px var(--nm-light); border: none;`;
+            } else if(state.style === 'gradient-modern') {
+                shadows = `box-shadow: 0 25px 50px rgba(0,0,0,0.15); border: 1px solid rgba(255,255,255,0.3); backdrop-filter: blur(12px); background: linear-gradient(135deg, rgba(255,255,255,0.7), rgba(255,255,255,0.3));`;
+                btnStyles = `background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%); color: white; border: none; box-shadow: 0 8px 20px rgba(0,0,0,0.15);`;
+            }
+
+            const cssCode = `
+:root {
+  /* Atmosphere Variables */
+  --primary: ${state.primary};
+  --bg: ${state.bg};
+  --text: ${state.text};
+  --accent: ${state.accent};
+  --font-main: ${state.font};
+  --radius: ${state.radius};
+
+  /* Adaptive Neomorphic Calculation Engine (Derived from BG) */
+  --nm-light: color-mix(in srgb, var(--bg), white 45%);
+  --nm-dark: color-mix(in srgb, var(--bg), black 18%);
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: var(--font-main);
+  margin: 0;
+  line-height: 1.6;
+}
+
+.card {
+  background-color: var(--bg);
+  border-radius: var(--radius);
+  padding: 3rem;
+  ${shadows}
+}
+
+${state.style === 'neomorphism' ? `
+.card:hover {
+  transform: translateY(-8px);
+  box-shadow: ${nmHover};
+}
+` : ''}
+
+.btn {
+  display: inline-block;
+  padding: 1rem 2rem;
+  border-radius: var(--radius);
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  ${btnStyles}
+}
+
+.btn:active {
+  ${state.style === 'neomorphism' ? `box-shadow: inset 4px 4px 8px var(--nm-dark), inset -4px -4px 8px var(--nm-light);` : `transform: scale(0.96);`}
+}
+            `.trim();
+
+            output.innerText = cssCode;
+        }
+
+        function copyCode() {
+            const text = output.innerText;
+            const tempInput = document.createElement('textarea');
+            tempInput.value = text;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempInput);
+
+            const feedback = document.getElementById('copyFeedback');
+            feedback.style.opacity = '1';
+            setTimeout(() => feedback.style.opacity = '0', 2000);
+        }
+
+        Object.values(inputs).forEach(input => {
+            input.addEventListener('input', updateStyles);
+        });
+
+        // Initialize with Neomorphism
+        setStyle('neomorphism');
+        updateStyles();
+
+    </script>
+</body>
+</html>
