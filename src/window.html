@@ -127,7 +127,7 @@
             };
 
             const getWorkspace = () => state.workspaces.find(w => w.id === state.activeWorkspaceId);
-
+			
             // --- Tree Manipulation Logic ---
             
             // Extracts a node by ID from the tree. Cleans up empty splits/tab groups.
@@ -210,41 +210,54 @@
             // --- Window Actions ---
             
             function performWindowAction(id, action, e) {
+				console.log("TRIGGER");
                 if(e) e.stopPropagation();
                 const ws = getWorkspace();
-                
+				console.log(ws.floatingWindows);
                 // Find node
                 let nodeToActOn = null;
                 let isFloating = false;
 
                 // Check floating
                 const fIndex = ws.floatingWindows.findIndex(w => w.id === id);
+				console.log(fIndex);
                 if (fIndex > -1) {
-                    nodeToActOn = ws.floatingWindows[fIndex];
+                    nodeToActOn = ws.floatingWindows.splice(fIndex,1)[0];
                     isFloating = true;
                 }
-
+console.log('1 ' + ws.floatingWindows.find(w => w.id === id));
                 // Check tree
                 if (!nodeToActOn) {
+					
                     const { extracted, newRoot } = extractNodeFromTree(ws.rootNode, id);
                     nodeToActOn = extracted;
                     if(extracted) ws.rootNode = newRoot;
                 }
-
+console.log('2');
                 // Check minimized
                 if (!nodeToActOn) {
                     const mIndex = state.minimizedWindows.findIndex(w => w.id === id);
+					console.log(mIndex);
                     if (mIndex > -1) {
                         nodeToActOn = state.minimizedWindows.splice(mIndex, 1)[0];
                     }
                 }
 
+console.log('3');				
+				// Check maximized
+                if (!nodeToActOn) {
+                    const mIndex = state.maximizedWindows.findIndex(w => w.id === id);
+                    if (mIndex > -1) {
+                        nodeToActOn = state.maximizedWindows.splice(mIndex, 1)[0];
+                    }
+                }
+console.log('4');
                 if (!nodeToActOn) return; // Node not found
-
+				console.log(nodeToActOn);
                 switch(action) {
                     case 'close':
                         // Discard node
-                        if(ws.maximizedNode === id) ws.maximizedNode = null;
+                        if(ws.nodeToActOn === id) ws.nodeToActOn = null;
                         break;
                     case 'minimize':
                         state.minimizedWindows.push(nodeToActOn);
@@ -261,7 +274,7 @@
                             ws.maximizedNode = id;
                             if(isFloating) ws.floatingWindows.splice(fIndex, 1);
                             // We put it back where we found it to keep state, just mark maximized
-                            if(!isFloating && ws.rootNode !== nodeToActOn) {
+                            if(ws.rootNode !== nodeToActOn) {
                                 ws.rootNode = insertNodeIntoTree(ws.rootNode, ws.rootNode?.id, nodeToActOn, 'center') || nodeToActOn; 
                             }
                         }
@@ -294,7 +307,7 @@
             // --- Drag and Drop Engine (The Core Requirement) ---
 
             function startDrag(e, id, sourceFloating = false) {
-                if (e.target.closest('.window-controls') || e.target.closest('.resize-handle')) return;
+                if (e.target.closest('.window-controls') || e.target.closest('.resize-handle')|| e.target.closest('.close')) return;
                 
                 const ws = getWorkspace();
                 if(ws.maximizedNode) return; // No dragging while maximized
@@ -555,7 +568,7 @@
             // --- Rendering Engine ---
 
             const Icons = {
-                close: `<svg class="w-3.5 h-3.5 hover:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>`,
+                close: `<svg class="w-3.5 h-3.5 close hover:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>`,
                 min: `<svg class="w-3.5 h-3.5 hover:text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/></svg>`,
                 max: `<svg class="w-3.5 h-3.5 hover:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>`,
                 pop: `<svg class="w-3.5 h-3.5 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>`
@@ -608,7 +621,7 @@
                                         onmousedown="System.startDrag(event, '${c.id}', false)">
                                         ${c.title}
                                         <button onclick="System.performWindowAction('${c.id}', 'close', event)" class="p-0.5 hover:bg-gray-700 rounded text-gray-500 hover:text-white transition-colors">
-                                            <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                            <svg class="w-3 h-3 close" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                                         </button>
                                     </div>
                                 `).join('')}
@@ -633,13 +646,13 @@
                     `;
                 }
             }
-
+<!--onmousedown="System.bringToFront('${win.id}')-->
             function renderFloating(windows) {
                 return windows.map(win => `
                     <div id="float-${win.id}" class="absolute flex flex-col bg-gray-900 border border-gray-600 rounded-lg shadow-2xl overflow-hidden animate-pop drop-target"
                          style="left: ${win.x}px; top: ${win.y}px; width: ${win.w}px; height: ${win.h}px; z-index: 30;"
                          data-id="${win.id}"
-                         onmousedown="System.bringToFront('${win.id}')">
+                         ">
                         ${renderHeader(win, true)}
                         <div class="flex-1 relative bg-gray-950 p-2 overflow-auto text-gray-300">
                             <div class="drag-shield"></div>
@@ -723,7 +736,7 @@
                     const win = {
                         id: uid(), type: 'window', 
                         title: titles[Math.floor(Math.random() * titles.length)], 
-                        content: `<div class="p-4 text-gray-400">Content for newly spawned window. Drag me anywhere.</div>`
+                        content: `<div class="p-4 text-gray-400"><button onClick="console.log('click')">Test</button></div>`
                     };
                     const ws = getWorkspace();
                     

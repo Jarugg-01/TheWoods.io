@@ -3,541 +3,771 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Forest Whispers - Lofi Voice Chat</title>
+    <title>Advanced Layout Manager</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-    <script src="https://www.youtube.com/iframe_api"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600;700&family=Lora:ital,wght@0,400;0,700;1,400&display=swap');
+        /* Base styles and custom scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #1f2937; }
+        ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+
+        body { overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+
+        /* Smooth spring-based transitions for layout changes */
+        .spring-transition {
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.1);
+        }
         
-        :root {
-            --woods-moss: #4A5D4E;
-            --woods-bark: #3E362E;
-            --woods-fog: #E8EBE4;
-            --woods-paper: #FDFBF7;
-            --woods-leaf: #A3B18A;
-            --woods-clay: #D4A373;
-            --woods-shadow: rgba(62, 54, 46, 0.1);
+        /* Fast transition for snap overlays */
+        .snap-transition {
+            transition: all 0.15s ease-out;
         }
 
-        body { 
-            font-family: 'Quicksand', sans-serif; 
-            background-color: var(--woods-fog); 
-            color: var(--woods-bark);
-            margin: 0;
-            height: 100vh;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
+        /* Splitters */
+        .split-resizer-v { cursor: col-resize; z-index: 10; width: 6px; margin: 0 -3px; background: transparent; position: relative; }
+        .split-resizer-v::after { content: ''; position: absolute; top: 0; bottom: 0; left: 2px; right: 2px; background: #374151; transition: background 0.2s; }
+        .split-resizer-v:hover::after, .split-resizer-v.active::after { background: #3b82f6; }
+
+        .split-resizer-h { cursor: row-resize; z-index: 10; height: 6px; margin: -3px 0; background: transparent; position: relative; }
+        .split-resizer-h::after { content: ''; position: absolute; left: 0; right: 0; top: 2px; bottom: 2px; background: #374151; transition: background 0.2s; }
+        .split-resizer-h:hover::after, .split-resizer-h.active::after { background: #3b82f6; }
+
+        /* Drag interactions */
+        .drag-shield { display: none; position: absolute; inset: 0; z-index: 50; background: transparent; }
+        body.is-dragging .drag-shield { display: block; }
+        body.is-dragging * { user-select: none !important; }
+
+        /* Floating Window Resize Handle */
+        .resize-handle {
+            position: absolute;
+            right: 0; bottom: 0;
+            width: 15px; height: 15px;
+            cursor: nwse-resize;
+            z-index: 20;
         }
 
-        h1, h2, h3, .serif { font-family: 'Lora', serif; }
-
-        /* Wireframe Styles */
-        .top-shelf {
-            background: #8A8A8A;
-            border-radius: 1.5rem;
-            color: white;
-            padding: 1rem;
-            text-align: center;
+        /* Animations */
+        @keyframes popIn {
+            0% { opacity: 0; transform: scale(0.95); }
+            100% { opacity: 1; transform: scale(1); }
         }
-
-        .shelf-item {
-            background: #B5B5B5;
-            border-radius: 1rem;
-            width: 60px;
-            height: 60px;
-            margin: 0 auto;
-            border-bottom: 4px solid #999;
-            cursor: pointer;
-            transition: transform 0.2s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.5rem;
-        }
-        .shelf-item:hover { transform: scale(1.05); }
-
-        .chat-room-card {
-            background: #E0E0E0;
-            border-radius: 1.5rem;
-            padding: 1rem;
-            width: 100%;
-            min-height: 200px;
-            transition: all 0.3s;
-        }
-
-        .peer-pill {
-            background: white;
-            border-radius: 1rem;
-            padding: 0.5rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            margin-bottom: 0.5rem;
-            border: 2px solid transparent;
-        }
-
-        .peer-pill.speaking {
-            border-color: #A3B18A;
-            box-shadow: 0 0 10px rgba(163, 177, 138, 0.5);
-        }
-
-        .peer-pill .avatar {
-            width: 32px;
-            height: 32px;
-            background: #B5B5B5;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-weight: bold;
-        }
-
-        .widget-area {
-            background: white;
-            border: 2px solid #E0E0E0;
-            border-radius: 2rem;
-            flex: 1;
-            padding: 1.5rem;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-
-        .bottom-dock {
-            background: #8A8A8A;
-            height: 80px;
-            border-radius: 40px 40px 0 0;
-            padding: 0 2rem;
-            display: flex;
-            align-items: center;
-            color: white;
-            gap: 2rem;
-        }
-
-        .dock-btn {
-            width: 44px;
-            height: 44px;
-            background: #B5B5B5;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .dock-btn:hover { background: #999; }
-        .dock-btn.active { background: #4A5D4E; }
-        .dock-btn.danger { background: #EF4444; }
-
-        .divider-line {
-            display: flex;
-            align-items: center;
-            text-align: center;
-            color: #999;
-            font-size: 0.75rem;
-            margin: 1rem 0;
-        }
-        .divider-line::before, .divider-line::after {
-            content: '';
-            flex: 1;
-            border-bottom: 1px solid #CCC;
-        }
-        .divider-line:not(:empty)::before { margin-right: .5em; }
-        .divider-line:not(:empty)::after { margin-left: .5em; }
-
-        .yt-hidden { position: absolute; left: -9999px; }
-
-        /* Custom Scrollbar */
-        ::-webkit-scrollbar { width: 4px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #CCC; border-radius: 10px; }
+        .animate-pop { animation: popIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.2) forwards; }
     </style>
 </head>
-<body class="p-6">
+<body class="bg-gray-950 text-gray-200 h-screen flex flex-col">
 
-    <!-- Setup View Overlay -->
-    <div id="setup-view" class="fixed inset-0 z-[1000] flex items-center justify-center bg-[--woods-fog]">
-        <div class="w-full max-w-md text-center space-y-8 p-6">
-            <h2 class="text-5xl font-bold text-[--woods-bark] serif">Forest Whispers</h2>
-            <div class="bg-white rounded-3xl p-8 shadow-xl space-y-6">
-                <input id="setup-username-input" type="text" placeholder="Your name..." class="w-full border-2 border-[#A3B18A] rounded-xl p-3 text-center focus:outline-none focus:ring-2 focus:ring-[#A3B18A]">
-                <div class="grid grid-cols-2 gap-4">
-                    <button onclick="handleHost()" class="bg-[#4A5D4E] text-white py-3 rounded-full font-bold hover:bg-[#3E362E] transition-colors">Host Room</button>
-                    <button onclick="showJoinInput()" class="bg-[#A3B18A] text-white py-3 rounded-full font-bold hover:bg-[#8A9672] transition-colors">Join Room</button>
-                </div>
-            </div>
+    <!-- Topbar: Workspaces & Controls -->
+    <header class="h-12 bg-gray-900 border-b border-gray-800 flex items-center px-4 justify-between shrink-0 z-40">
+        <div class="flex items-center gap-2" id="workspace-tabs">
+            <!-- Workspace tabs injected here -->
         </div>
-    </div>
-
-    <!-- Main Application UI -->
-    <div id="lobby-view" class="hidden h-full flex flex-col space-y-4 animate-in fade-in duration-500">
         
-        <!-- Top Shelf -->
-        <div class="grid grid-cols-12 gap-4">
-            <div class="col-span-4 top-shelf">
-                <p class="text-[10px] uppercase font-bold tracking-widest mb-3 opacity-80">Room Management</p>
-                <div class="flex justify-between px-4">
-                    <div class="shelf-item" onclick="copyInvite()" title="Copy Invite ID">🔗</div>
-                    <div class="shelf-item" onclick="location.reload()" title="New Room">🏠</div>
-                    <div class="shelf-item" style="opacity: 0.3"></div>
-                    <div class="shelf-item" style="opacity: 0.3"></div>
-                </div>
+        <div class="flex items-center gap-4">
+            <div id="dock" class="flex gap-2 items-center bg-gray-800 px-3 py-1.5 rounded-md shadow-inner hidden">
+                <span class="text-xs text-gray-400 font-semibold mr-2">DOCK</span>
+                <!-- Minimized windows go here -->
             </div>
-            <div class="col-span-4 top-shelf flex flex-col justify-between">
-                <p class="text-[10px] uppercase font-bold tracking-widest opacity-80">Media Preview</p>
-                <div class="px-4">
-                    <div id="media-status" class="text-[10px] truncate opacity-60 mb-1 italic">Silent Grove...</div>
-                    <div class="w-full h-1.5 bg-[#B5B5B5] rounded-full overflow-hidden">
-                        <div id="media-progress" class="h-full bg-white w-0 transition-all duration-1000"></div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-span-4 top-shelf">
-                <p class="text-[10px] uppercase font-bold tracking-widest mb-3 opacity-80">Widgets Menu</p>
-                <div class="flex justify-between px-4">
-                    <div class="shelf-item !rounded-2xl" onclick="switchWidget('chat')" title="Chat">💬</div>
-                    <div class="shelf-item !rounded-2xl" onclick="switchWidget('peers')" title="Room Info">👥</div>
-                    <div class="shelf-item !rounded-2xl" onclick="switchWidget('settings')" title="Music Settings">🎵</div>
-                    <div class="shelf-item !rounded-2xl" onclick="switchWidget('plus')" title="Add More">＋</div>
-                </div>
-            </div>
+            <button onclick="System.addRandomWindow()" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-1.5 rounded text-sm font-medium transition-colors flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                New Window
+            </button>
         </div>
+    </header>
 
-        <div class="divider-line">the clearing</div>
+    <!-- Main Workspace Area -->
+    <main id="workspace-container" class="flex-1 relative p-2 overflow-hidden bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCI+CjxyZWN0IHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCIgZmlsbD0ibm9uZSIvPgo8Y2lyY2xlIGN4PSIxMCIgY3k9IjEwIiByPSIxIiBmaWxsPSIjMzM0MTU1Ii8+Cjwvc3ZnPg==')]">
+        <!-- The layout tree is injected here -->
+    </main>
 
-        <!-- Main Workspace -->
-        <div class="flex-1 flex gap-6 min-h-0">
-            <!-- Left Sidebar: Active Chat Room -->
-            <div class="w-72 flex flex-col gap-4 overflow-hidden">
-                <div class="chat-room-card flex flex-col h-full">
-                    <div class="w-12 h-1 bg-[#B5B5B5] rounded-full mx-auto mb-4 flex-shrink-0"></div>
-                    <p id="room-title-display" class="text-[10px] font-bold text-[#999] uppercase mb-4 flex-shrink-0">Chat Room 1</p>
-                    <div id="peer-list-container" class="flex-1 overflow-y-auto pr-2">
-                        <!-- User Pills populate here -->
-                        <div id="local-peer-pill" class="peer-pill">
-                            <div class="avatar" id="local-avatar">Y</div>
-                            <div class="flex flex-col">
-                                <span class="text-xs font-bold text-[#666]" id="local-name-display">You</span>
-                                <span class="text-[9px] opacity-50 uppercase">Local</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Right Workspace: Dynamic Widgets -->
-            <div class="flex-1 flex flex-col">
-                <div class="widget-area" id="active-widget">
-                    <!-- Default State -->
-                    <div class="flex flex-col items-center justify-center h-full text-[#B5B5B5]">
-                        <div class="flex items-center gap-4">
-                            <span class="text-6xl">+</span>
-                            <span>select a widget</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Bottom Controls -->
-        <div class="bottom-dock">
-            <div class="flex items-center gap-2">
-                <span class="text-xs font-bold opacity-70" id="dock-room-label">ROOM: ----</span>
-                <span class="text-[8px] transform rotate-180">▲</span>
-            </div>
-            <div class="flex gap-3">
-                <div id="mute-btn" class="dock-btn" onclick="toggleMute()" title="Mute/Unmute">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path></svg>
-                </div>
-                <div id="deafen-btn" class="dock-btn" onclick="toggleDeafen()" title="Deafen">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 5L6 9H2v6h4l5 4V5z"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
-                </div>
-                <div class="dock-btn" onclick="switchWidget('settings')" title="Music">📻</div>
-                <div class="dock-btn danger" onclick="location.reload()" title="Leave Room">✕</div>
-            </div>
-            <div class="flex-1 text-right">
-                <div id="media-title-dock" class="font-bold tracking-widest text-xs opacity-80 truncate">MEDIA PLAYER IDLE</div>
-                <div class="text-[9px] opacity-40 uppercase tracking-tighter">Synchronized Audio</div>
-            </div>
-        </div>
-    </div>
-
-    <div id="youtube-anchor" class="yt-hidden"></div>
+    <!-- Drop Zone Highlight Overlay -->
+    <div id="drop-overlay" class="fixed bg-blue-500/20 border-2 border-blue-400 rounded pointer-events-none z-50 snap-transition hidden backdrop-blur-[2px]"></div>
 
     <script>
-        // --- State Management ---
-        let peer = null;
-        let localStream = null;
-        let isMuted = false;
-        let isDeafened = false;
-        let connections = {};
-        let myName = "Spirit";
-        let ytPlayer = null;
-        let currentWidget = 'plus';
+        /**
+         * System Core: Manages State, Drag & Drop Engine, and Rendering.
+         * Built as a clean ES6 Module-pattern singleton.
+         */
+        const System = (() => {
+            // --- Helper: Generate UUID ---
+            const uid = () => Math.random().toString(36).substr(2, 9);
 
-        // --- YouTube API ---
-        function onYouTubeIframeAPIReady() {
-            ytPlayer = new YT.Player('youtube-anchor', {
-                height: '0', width: '0', videoId: 'jfKfPfyJRdk',
-                playerVars: { 'autoplay': 1, 'controls': 0, 'enablejsapi': 1 },
-                events: { 
-                    'onReady': (e) => {
-                        e.target.setVolume(40);
-                        updateMediaUI();
+            // --- State Management ---
+            let state = {
+                workspaces: [
+                    {
+                        id: 'ws-1', name: 'Main Dev',
+                        rootNode: {
+                            id: uid(), type: 'split', direction: 'horizontal', ratio: 0.6,
+                            children: [
+                                { id: uid(), type: 'window', title: 'Code Editor', content: '<div class="p-4 text-green-400 font-mono text-sm">const LayoutEngine = new Engine();<br/>LayoutEngine.start();</div>' },
+                                {
+                                    id: uid(), type: 'split', direction: 'vertical', ratio: 0.5,
+                                    children: [
+                                        { id: uid(), type: 'window', title: 'Terminal', content: '<div class="p-4 text-gray-300 font-mono text-sm">$ npm start<br/>> Server running on port 3000</div>' },
+                                        { id: uid(), type: 'window', title: 'Preview', content: '<div class="flex items-center justify-center h-full text-gray-500">App Preview</div>' }
+                                    ]
+                                }
+                            ]
+                        },
+                        floatingWindows: [], maximizedNode: null
                     },
-                    'onStateChange': (e) => updateMediaUI()
+                    {
+                        id: 'ws-2', name: 'Monitoring',
+                        rootNode: { id: uid(), type: 'window', title: 'Metrics Dashboard', content: '<div class="flex items-center justify-center h-full text-blue-400">System Analytics</div>' },
+                        floatingWindows: [], maximizedNode: null
+                    }
+                ],
+                activeWorkspaceId: 'ws-1',
+                minimizedWindows: [], // Global dock across workspaces
+                
+                // Interaction State
+                drag: { isDragging: false, node: null, ghostEl: null, type: null, startX: 0, startY: 0, offsetX: 0, offsetY: 0, sourceFloating: false },
+                splitResize: { isResizing: false, node: null, index: 0, startX: 0, startY: 0, startRatio: 0 }
+            };
+
+            const getWorkspace = () => state.workspaces.find(w => w.id === state.activeWorkspaceId);
+			
+            // --- Tree Manipulation Logic ---
+            
+            // Extracts a node by ID from the tree. Cleans up empty splits/tab groups.
+            function extractNodeFromTree(root, id) {
+                if (!root) return { newRoot: null, extracted: null };
+                if (root.id === id) return { newRoot: null, extracted: root };
+
+                if (root.children) {
+                    for (let i = 0; i < root.children.length; i++) {
+                        const { newRoot: childNewRoot, extracted } = extractNodeFromTree(root.children[i], id);
+                        if (extracted) {
+                            if (childNewRoot) {
+                                root.children[i] = childNewRoot;
+                            } else {
+                                root.children.splice(i, 1);
+                                // Cleanup if only 1 child left in a split/tab group
+                                if (root.children.length === 1) {
+                                    return { newRoot: root.children[0], extracted };
+                                }
+                                if (root.children.length === 0) {
+                                    return { newRoot: null, extracted };
+                                }
+                            }
+                            // Maintain valid ratios if split
+                            if (root.type === 'split' && root.children.length > 0) root.ratio = 0.5;
+                            return { newRoot: root, extracted };
+                        }
+                    }
                 }
-            });
-            setInterval(updateMediaProgress, 1000);
-        }
-
-        function updateMediaUI() {
-            if (!ytPlayer || !ytPlayer.getVideoData) return;
-            const data = ytPlayer.getVideoData();
-            const title = data.title || "Silent Grove";
-            document.getElementById('media-status').innerText = title;
-            document.getElementById('media-title-dock').innerText = title.toUpperCase();
-        }
-
-        function updateMediaProgress() {
-            if (!ytPlayer || ytPlayer.getPlayerState?.() !== 1) return;
-            const duration = ytPlayer.getDuration();
-            const current = ytPlayer.getCurrentTime();
-            if (duration > 0) {
-                const perc = (current / duration) * 100;
-                document.getElementById('media-progress').style.width = perc + "%";
+                return { newRoot: root, extracted: null };
             }
-        }
 
-        // --- P2P Logic ---
-        async function handleHost() {
-            myName = document.getElementById('setup-username-input').value.trim() || 'Host';
-            await requestMedia();
-            const id = Math.random().toString(36).substring(2, 8).toUpperCase();
-            initPeer(id);
-            enterLobby();
-        }
+            // Inserts a node relative to a target node based on the drop zone
+            function insertNodeIntoTree(root, targetId, newNode, zone) {
+                if (!root) return newNode;
 
-        function showJoinInput() {
-            const id = prompt("Enter Room ID:");
-            if (!id) return;
-            myName = document.getElementById('setup-username-input').value.trim() || 'Guest';
-            requestMedia().then(() => {
-                initPeer();
-                peer.on('open', () => {
-                    const conn = peer.connect(id.toUpperCase(), { metadata: { name: myName } });
-                    setupConn(conn);
-                    peer.call(id.toUpperCase(), localStream);
-                    enterLobby();
-                });
-            });
-        }
+                if (root.id === targetId) {
+                    if (zone === 'center') {
+                        // Merge into Tabs
+                        if (root.type === 'tabGroup') {
+                            root.children.push(newNode);
+                            root.activeTabId = newNode.id;
+                            return root;
+                        } else {
+                            return {
+                                id: uid(), type: 'tabGroup', activeTabId: newNode.id,
+                                children: [root, newNode]
+                            };
+                        }
+                    } else {
+                        // Create Split
+                        const isHoriz = zone === 'left' || zone === 'right';
+                        const isFirst = zone === 'left' || zone === 'top';
+                        return {
+                            id: uid(), type: 'split', direction: isHoriz ? 'horizontal' : 'vertical', ratio: 0.5,
+                            children: isFirst ? [newNode, root] : [root, newNode]
+                        };
+                    }
+                }
 
-        async function requestMedia() {
-            try {
-                localStream = await navigator.mediaDevices.getUserMedia({ 
-                    audio: { echoCancellation: true, noiseSuppression: true } 
-                });
-            } catch (err) {
-                console.error("Mic access denied", err);
-                alert("Microphone access is required for voice chat.");
+                if (root.children) {
+                    root.children = root.children.map(c => insertNodeIntoTree(c, targetId, newNode, zone));
+                }
+                return root;
             }
-        }
 
-        function initPeer(id = null) {
-            peer = id ? new Peer(id) : new Peer();
+            // Find a node deep in the tree (for pop-out or maximize)
+            function findNode(root, id) {
+                if (!root) return null;
+                if (root.id === id) return root;
+                if (root.children) {
+                    for (let c of root.children) {
+                        const found = findNode(c, id);
+                        if (found) return found;
+                    }
+                }
+                return null;
+            }
+
+            // --- Window Actions ---
             
-            peer.on('open', (id) => {
-                document.getElementById('dock-room-label').innerText = `ROOM: ${id}`;
-                document.getElementById('room-title-display').innerText = `CLEARING: ${id}`;
-            });
+            function performWindowAction(id, action, e) {
+				console.log("TRIGGER");
+                if(e) e.stopPropagation();
+                const ws = getWorkspace();
+				console.log(ws.floatingWindows);
+                // Find node
+                let nodeToActOn = null;
+                let isFloating = false;
 
-            peer.on('connection', setupConn);
+                // Check floating
+                const fIndex = ws.floatingWindows.findIndex(w => w.id === id);
+				console.log(fIndex);
+                if (fIndex > -1) {
+                    nodeToActOn = ws.floatingWindows.splice(fIndex,1)[0];
+                    isFloating = true;
+                }
+console.log('1 ' + ws.floatingWindows.find(w => w.id === id));
+                // Check tree
+                if (!nodeToActOn) {
+					
+                    const { extracted, newRoot } = extractNodeFromTree(ws.rootNode, id);
+                    nodeToActOn = extracted;
+                    if(extracted) ws.rootNode = newRoot;
+                }
+console.log('2');
+                // Check minimized
+                if (!nodeToActOn) {
+                    const mIndex = state.minimizedWindows.findIndex(w => w.id === id);
+					console.log(mIndex);
+                    if (mIndex > -1) {
+                        nodeToActOn = state.minimizedWindows.splice(mIndex, 1)[0];
+                    }
+                }
 
-            peer.on('call', (call) => {
-                call.answer(localStream);
-                call.on('stream', (remoteStream) => {
-                    const audio = new Audio();
-                    audio.srcObject = remoteStream;
-                    audio.dataset.peerId = call.peer;
-                    audio.play();
-                    addPeerToUI(call.peer, call.metadata?.name || "Spirit");
-                });
-            });
-        }
+console.log('3');				
+				// Check maximized
+                if (!nodeToActOn) {
+                    const mIndex = state.maximizedWindows.findIndex(w => w.id === id);
+                    if (mIndex > -1) {
+                        nodeToActOn = state.maximizedWindows.splice(mIndex, 1)[0];
+                    }
+                }
+console.log('4');
+                if (!nodeToActOn) return; // Node not found
+				console.log(nodeToActOn);
+                switch(action) {
+                    case 'close':
+                        // Discard node
+                        if(ws.nodeToActOn === id) ws.nodeToActOn = null;
+                        break;
+                    case 'minimize':
+                        state.minimizedWindows.push(nodeToActOn);
+                        if(ws.maximizedNode === id) ws.maximizedNode = null;
+                        if(isFloating) ws.floatingWindows.splice(fIndex, 1);
+                        break;
+                    case 'maximize':
+                        // Toggle maximize
+                        if (ws.maximizedNode === id) {
+                            ws.maximizedNode = null;
+                            if(isFloating) ws.floatingWindows.push(nodeToActOn);
+                            else ws.rootNode = insertNodeIntoTree(ws.rootNode, ws.rootNode?.id, nodeToActOn, 'right') || nodeToActOn; // Re-insert logic is simplified here; ideally stores previous location
+                        } else {
+                            ws.maximizedNode = id;
+                            if(isFloating) ws.floatingWindows.splice(fIndex, 1);
+                            // We put it back where we found it to keep state, just mark maximized
+                            if(ws.rootNode !== nodeToActOn) {
+                                ws.rootNode = insertNodeIntoTree(ws.rootNode, ws.rootNode?.id, nodeToActOn, 'center') || nodeToActOn; 
+                            }
+                        }
+                        break;
+                    case 'popout':
+                        if (ws.maximizedNode === id) ws.maximizedNode = null;
+                        // Calculate a nice default floating size based on viewport
+                        if(!nodeToActOn.x) {
+                            const rect = document.getElementById('workspace-container').getBoundingClientRect();
+                            nodeToActOn.w = Math.min(800, rect.width * 0.8);
+                            nodeToActOn.h = Math.min(600, rect.height * 0.8);
+                            nodeToActOn.x = rect.width / 2 - nodeToActOn.w / 2;
+                            nodeToActOn.y = rect.height / 2 - nodeToActOn.h / 2;
+                        }
+                        ws.floatingWindows.push(nodeToActOn);
+                        break;
+                    case 'restore':
+                        // From dock to floating
+                        const rect = document.getElementById('workspace-container').getBoundingClientRect();
+                        nodeToActOn.x = rect.width / 2 - 200;
+                        nodeToActOn.y = rect.height / 2 - 150;
+                        nodeToActOn.w = 400; nodeToActOn.h = 300;
+                        ws.floatingWindows.push(nodeToActOn);
+                        break;
+                }
+                
+                render();
+            }
 
-        function setupConn(conn) {
-            connections[conn.peer] = conn;
-            conn.on('open', () => {
-                addPeerToUI(conn.peer, conn.metadata?.name || "Spirit");
-            });
-            conn.on('data', (data) => {
-                if (data.type === 'chat') handleIncomingChat(data);
-                if (data.type === 'sync-music') handleMusicSync(data);
-            });
-        }
+            // --- Drag and Drop Engine (The Core Requirement) ---
 
-        function enterLobby() {
-            document.getElementById('setup-view').classList.add('hidden');
-            document.getElementById('lobby-view').classList.remove('hidden');
-            document.getElementById('local-name-display').innerText = myName;
-            document.getElementById('local-avatar').innerText = myName[0].toUpperCase();
-            switchWidget('chat');
-        }
+            function startDrag(e, id, sourceFloating = false) {
+                if (e.target.closest('.window-controls') || e.target.closest('.resize-handle')|| e.target.closest('.close')) return;
+                
+                const ws = getWorkspace();
+                if(ws.maximizedNode) return; // No dragging while maximized
 
-        // --- UI Interactions ---
-        function addPeerToUI(id, name) {
-            if (document.getElementById(`peer-${id}`)) return;
-            const container = document.getElementById('peer-list-container');
-            const isRight = container.children.length % 2 === 0;
-            
-            const pill = document.createElement('div');
-            pill.id = `peer-${id}`;
-            pill.className = `peer-pill animate-in slide-in-from-left-2 ${isRight ? 'flex-row-reverse text-right' : ''}`;
-            pill.innerHTML = `
-                <div class="avatar">${name[0].toUpperCase()}</div>
-                <div class="flex flex-col">
-                    <span class="text-xs font-bold text-[#666]">${name}</span>
-                    <span class="text-[9px] opacity-40 uppercase">Connected</span>
-                </div>
-            `;
-            container.appendChild(pill);
-        }
+                let nodeData;
+                if (sourceFloating) {
+                    nodeData = ws.floatingWindows.find(w => w.id === id);
+                    // Bring to front
+                    ws.floatingWindows = ws.floatingWindows.filter(w => w.id !== id);
+                    ws.floatingWindows.push(nodeData);
+                } else {
+                    nodeData = findNode(ws.rootNode, id);
+                }
 
-        function toggleMute() {
-            isMuted = !isMuted;
-            if (localStream) localStream.getAudioTracks()[0].enabled = !isMuted;
-            document.getElementById('mute-btn').classList.toggle('danger', isMuted);
-        }
+                if (!nodeData) return;
 
-        function toggleDeafen() {
-            isDeafened = !isDeafened;
-            document.querySelectorAll('audio').forEach(a => a.muted = isDeafened);
-            document.getElementById('deafen-btn').classList.toggle('danger', isDeafened);
-        }
+                // Create Ghost element for visual feedback
+                const ghost = document.createElement('div');
+                ghost.className = 'fixed pointer-events-none opacity-80 shadow-2xl z-[9999] bg-gray-900 border border-gray-600 rounded overflow-hidden';
+                ghost.style.width = '300px'; // Ghost size
+                ghost.style.height = '40px'; // Just the header
+                ghost.innerHTML = `<div class="bg-gray-800 p-2 text-sm font-semibold flex items-center gap-2"><svg class="w-4 h-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"/></svg>${nodeData.title || 'Window'}</div>`;
+                document.body.appendChild(ghost);
 
-        function copyInvite() {
-            if (!peer || !peer.id) return;
-            navigator.clipboard.writeText(peer.id);
-            const btn = document.querySelector('[onclick="copyInvite()"]');
-            const old = btn.innerText;
-            btn.innerText = "✓";
-            setTimeout(() => btn.innerText = old, 2000);
-        }
+                state.drag = {
+                    isDragging: true,
+                    node: JSON.parse(JSON.stringify(nodeData)), // Deep copy
+                    originalId: id,
+                    ghostEl: ghost,
+                    startX: e.clientX,
+                    startY: e.clientY,
+                    offsetX: 150, // Center ghost on cursor
+                    offsetY: 20,
+                    sourceFloating,
+                    activeTargetId: null,
+                    activeZone: null
+                };
 
-        // --- Widgets ---
-        function switchWidget(type) {
-            const container = document.getElementById('active-widget');
-            currentWidget = type;
-            
-            switch(type) {
-                case 'chat':
-                    container.innerHTML = `
-                        <div class="flex flex-col h-full">
-                            <h3 class="serif text-xl font-bold mb-4">Whispers</h3>
-                            <div id="chat-box" class="flex-1 overflow-y-auto space-y-2 mb-4 pr-2"></div>
-                            <div class="flex gap-2">
-                                <input id="widget-chat-input" type="text" placeholder="Send a message..." class="flex-1 border-2 border-[#E0E0E0] rounded-xl px-4 py-2 text-sm focus:outline-none">
-                                <button onclick="sendChat()" class="bg-[#8A8A8A] text-white px-4 rounded-xl font-bold">></button>
-                            </div>
+                document.body.classList.add('is-dragging');
+                updateGhostPosition(e.clientX, e.clientY);
+                
+                // Add event listeners
+                document.addEventListener('mousemove', onDragMove);
+                document.addEventListener('mouseup', onDragEnd);
+                document.addEventListener('keydown', onDragCancel);
+            }
+
+            function updateGhostPosition(x, y) {
+                if (!state.drag.ghostEl) return;
+                state.drag.ghostEl.style.left = `${x - state.drag.offsetX}px`;
+                state.drag.ghostEl.style.top = `${y - state.drag.offsetY}px`;
+            }
+
+            function onDragMove(e) {
+                if (!state.drag.isDragging) return;
+                updateGhostPosition(e.clientX, e.clientY);
+
+                // Math-heavy Snapping Logic (Proximity & Quadrants)
+                // Find potential drop target element underneath cursor
+                const elements = document.elementsFromPoint(e.clientX, e.clientY);
+                const targetEl = elements.find(el => el.classList.contains('drop-target') && el.dataset.id !== state.drag.originalId);
+
+                const overlay = document.getElementById('drop-overlay');
+
+                if (targetEl) {
+                    const rect = targetEl.getBoundingClientRect();
+                    const x = e.clientX;
+                    const y = e.clientY;
+                    
+                    // Advanced mathematical proximity calculation as requested:
+                    // Distance = sqrt((x2 - x1)^2 + (y2 - y1)^2)
+                    // We check orthogonal distance to edges
+                    const distLeft = Math.abs(x - rect.left);
+                    const distRight = Math.abs(x - rect.right);
+                    const distTop = Math.abs(y - rect.top);
+                    const distBottom = Math.abs(y - rect.bottom);
+                    
+                    const minEdgeDist = Math.min(distLeft, distRight, distTop, distBottom);
+                    const SNAP_THRESHOLD = 40; // Pixels
+
+                    let zone = 'center'; // Default to tab merge
+
+                    // If close to an edge, trigger split snap
+                    if (minEdgeDist < SNAP_THRESHOLD) {
+                        if (minEdgeDist === distLeft) zone = 'left';
+                        else if (minEdgeDist === distRight) zone = 'right';
+                        else if (minEdgeDist === distTop) zone = 'top';
+                        else if (minEdgeDist === distBottom) zone = 'bottom';
+                    } else {
+                        // Quadrant fallback if not strictly near edge but inside
+                        const relX = x - rect.left;
+                        const relY = y - rect.top;
+                        const w = rect.width;
+                        const h = rect.height;
+                        const threshold = 0.25;
+
+                        if (relX < w * threshold) zone = 'left';
+                        else if (relX > w * (1 - threshold)) zone = 'right';
+                        else if (relY < h * threshold) zone = 'top';
+                        else if (relY > h * (1 - threshold)) zone = 'bottom';
+                    }
+
+                    state.drag.activeTargetId = targetEl.dataset.id;
+                    state.drag.activeZone = zone;
+
+                    // Update visual overlay
+                    let oTop = rect.top, oLeft = rect.left, oWidth = rect.width, oHeight = rect.height;
+                    
+                    if (zone === 'left') oWidth /= 2;
+                    if (zone === 'right') { oLeft += oWidth/2; oWidth /= 2; }
+                    if (zone === 'top') oHeight /= 2;
+                    if (zone === 'bottom') { oTop += oHeight/2; oHeight /= 2; }
+                    if (zone === 'center') { oTop += 10; oLeft += 10; oWidth -= 20; oHeight -= 20; }
+
+                    overlay.style.top = `${oTop}px`;
+                    overlay.style.left = `${oLeft}px`;
+                    overlay.style.width = `${oWidth}px`;
+                    overlay.style.height = `${oHeight}px`;
+                    overlay.style.display = 'block';
+
+                } else {
+                    state.drag.activeTargetId = null;
+                    state.drag.activeZone = null;
+                    overlay.style.display = 'none';
+                }
+            }
+
+            function onDragEnd(e) {
+                if (!state.drag.isDragging) return;
+                cleanupDrag();
+
+                const ws = getWorkspace();
+                const { originalId, node, activeTargetId, activeZone, sourceFloating, startX, startY } = state.drag;
+
+                // Check for pure click (no movement)
+                const dist = Math.hypot(e.clientX - startX, e.clientY - startY);
+                if (dist < 5) {
+                    render(); return; // Ignore micro-drags
+                }
+
+                // Remove node from its original location
+                if (sourceFloating) {
+                    ws.floatingWindows = ws.floatingWindows.filter(w => w.id !== originalId);
+                } else {
+                    const { newRoot } = extractNodeFromTree(ws.rootNode, originalId);
+                    ws.rootNode = newRoot;
+                }
+
+                if (activeTargetId && activeZone) {
+                    // Snapped into tree!
+                    // Ensure the node is formatted as a single window if it was a tabGroup
+                    const insertNode = node.type === 'window' ? node : { id: node.id, type: 'window', title: node.title, content: node.content };
+                    
+                    if (!ws.rootNode) {
+                        ws.rootNode = insertNode; // Workspace was empty
+                    } else {
+                        ws.rootNode = insertNodeIntoTree(ws.rootNode, activeTargetId, insertNode, activeZone);
+                    }
+                } else {
+                    // Popped out / Floating
+                    const rect = document.getElementById('workspace-container').getBoundingClientRect();
+                    node.x = Math.max(0, e.clientX - 150 - rect.left);
+                    node.y = Math.max(0, e.clientY - 20 - rect.top);
+                    node.w = node.w || 400;
+                    node.h = node.h || 300;
+                    ws.floatingWindows.push(node);
+                }
+
+                render();
+            }
+
+            function onDragCancel(e) {
+                if (e.key === 'Escape') {
+                    cleanupDrag();
+                    render();
+                }
+            }
+
+            function cleanupDrag() {
+                if (state.drag.ghostEl) state.drag.ghostEl.remove();
+                document.getElementById('drop-overlay').style.display = 'none';
+                document.body.classList.remove('is-dragging');
+                document.removeEventListener('mousemove', onDragMove);
+                document.removeEventListener('mouseup', onDragEnd);
+                document.removeEventListener('keydown', onDragCancel);
+                state.drag.isDragging = false;
+            }
+
+            // --- Floating Window Resize Logic ---
+            function startResize(e, id) {
+                e.stopPropagation();
+                const ws = getWorkspace();
+                const win = ws.floatingWindows.find(w => w.id === id);
+                if(!win) return;
+
+                state.splitResize = {
+                    isResizing: true, type: 'floating',
+                    node: win, startX: e.clientX, startY: e.clientY,
+                    startW: win.w, startH: win.h
+                };
+                
+                document.body.classList.add('is-dragging');
+                document.addEventListener('mousemove', onResizeMove);
+                document.addEventListener('mouseup', onResizeEnd);
+            }
+
+            function onResizeMove(e) {
+                if(!state.splitResize.isResizing) return;
+                if(state.splitResize.type === 'floating') {
+                    const { node, startX, startY, startW, startH } = state.splitResize;
+                    node.w = Math.max(200, startW + (e.clientX - startX));
+                    node.h = Math.max(100, startH + (e.clientY - startY));
+                    
+                    // Direct DOM update for performance
+                    const el = document.getElementById(`float-${node.id}`);
+                    if(el) { el.style.width = `${node.w}px`; el.style.height = `${node.height}px`; }
+                    render(); // Call render to ensure state is fully synced, acceptable in this optimized scope
+                } else {
+                    // Split pane resizing
+                    const { node, index, startX, startY, startRatio, isHoriz, totalSize } = state.splitResize;
+                    const delta = isHoriz ? (e.clientX - startX) : (e.clientY - startY);
+                    const deltaRatio = delta / totalSize;
+                    let newRatio = startRatio + deltaRatio;
+                    newRatio = Math.max(0.1, Math.min(0.9, newRatio)); // Limit to 10%-90%
+                    node.ratio = newRatio;
+                    render();
+                }
+            }
+
+            function onResizeEnd() {
+                state.splitResize.isResizing = false;
+                document.body.classList.remove('is-dragging');
+                document.removeEventListener('mousemove', onResizeMove);
+                document.removeEventListener('mouseup', onResizeEnd);
+            }
+
+            function startSplitResize(e, splitId, isHoriz) {
+                e.preventDefault();
+                const ws = getWorkspace();
+                const splitNode = findNode(ws.rootNode, splitId);
+                if(!splitNode) return;
+
+                const parentRect = e.target.parentElement.getBoundingClientRect();
+                const totalSize = isHoriz ? parentRect.width : parentRect.height;
+
+                state.splitResize = {
+                    isResizing: true, type: 'split',
+                    node: splitNode, isHoriz, totalSize,
+                    startX: e.clientX, startY: e.clientY,
+                    startRatio: splitNode.ratio || 0.5
+                };
+
+                document.body.classList.add('is-dragging');
+                document.addEventListener('mousemove', onResizeMove);
+                document.addEventListener('mouseup', onResizeEnd);
+            }
+
+            // --- Rendering Engine ---
+
+            const Icons = {
+                close: `<svg class="w-3.5 h-3.5 close hover:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>`,
+                min: `<svg class="w-3.5 h-3.5 hover:text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/></svg>`,
+                max: `<svg class="w-3.5 h-3.5 hover:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>`,
+                pop: `<svg class="w-3.5 h-3.5 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>`
+            };
+
+            function renderHeader(node, isFloating) {
+                return `
+                    <div class="window-header bg-gray-800 border-b border-gray-700 h-8 flex items-center justify-between px-3 shrink-0 cursor-grab active:cursor-grabbing select-none" 
+                         onmousedown="System.startDrag(event, '${node.id}', ${isFloating})"
+                         ondblclick="System.performWindowAction('${node.id}', 'maximize', event)">
+                        <div class="text-sm font-medium text-gray-300 truncate pointer-events-none">${node.title || 'Untitled'}</div>
+                        <div class="window-controls flex items-center gap-2 text-gray-500 z-10">
+                            <button onclick="System.performWindowAction('${node.id}', 'popout', event)" title="Pop out">${Icons.pop}</button>
+                            <button onclick="System.performWindowAction('${node.id}', 'minimize', event)" title="Minimize">${Icons.min}</button>
+                            <button onclick="System.performWindowAction('${node.id}', 'maximize', event)" title="Maximize">${Icons.max}</button>
+                            <button onclick="System.performWindowAction('${node.id}', 'close', event)" title="Close">${Icons.close}</button>
+                        </div>
+                    </div>
+                `;
+            }
+
+            function renderTree(node) {
+                if (!node) return `<div class="w-full h-full flex flex-col items-center justify-center text-gray-500 drop-target" data-id="root-empty">
+                    <svg class="w-16 h-16 mb-4 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                    <p>Workspace Empty</p><p class="text-sm mt-2">Drag a window here or click 'New Window'</p>
+                </div>`;
+
+                if (node.type === 'split') {
+                    const isHoriz = node.direction === 'horizontal';
+                    const ratio = node.ratio || 0.5;
+                    
+                    return `
+                        <div class="flex ${isHoriz ? 'flex-row' : 'flex-col'} w-full h-full overflow-hidden" data-id="${node.id}">
+                            <div class="relative spring-transition" style="${isHoriz ? `width: ${ratio * 100}%` : `height: ${ratio * 100}%`}">${renderTree(node.children[0])}</div>
+                            <div class="${isHoriz ? 'split-resizer-v' : 'split-resizer-h'} shrink-0" onmousedown="System.startSplitResize(event, '${node.id}', ${isHoriz})"></div>
+                            <div class="relative spring-transition flex-1">${renderTree(node.children[1])}</div>
                         </div>
                     `;
-                    document.getElementById('widget-chat-input').addEventListener('keypress', (e) => e.key === 'Enter' && sendChat());
-                    break;
-                case 'peers':
-                    container.innerHTML = `
-                        <div class="h-full flex flex-col">
-                            <h3 class="serif text-xl font-bold mb-4">Clearing Spirits</h3>
-                            <div class="space-y-4">
-                                <div class="p-4 bg-[#F9F9F9] rounded-2xl border border-[#EEE]">
-                                    <p class="text-[10px] uppercase font-bold opacity-40 mb-1">Local Identity</p>
-                                    <p class="font-bold">${myName} (You)</p>
-                                    <p class="text-xs opacity-60">ID: ${peer?.id || '---'}</p>
-                                </div>
-                                <div class="p-4 bg-[#F9F9F9] rounded-2xl border border-[#EEE]">
-                                    <p class="text-[10px] uppercase font-bold opacity-40 mb-1">Active Mesh</p>
-                                    <p class="font-bold">${Object.keys(connections).length + 1} Spirits present</p>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                    break;
-                case 'settings':
-                    container.innerHTML = `
-                        <div class="h-full flex flex-col">
-                            <h3 class="serif text-xl font-bold mb-4">Atmosphere Settings</h3>
-                            <div class="space-y-4">
-                                <div class="space-y-1">
-                                    <label class="text-[10px] uppercase font-bold opacity-50">YouTube Video ID</label>
-                                    <div class="flex gap-2">
-                                        <input id="yt-id-input" type="text" placeholder="e.g. jfKfPfyJRdk" class="flex-1 border-2 border-[#E0E0E0] rounded-xl px-4 py-2 text-sm">
-                                        <button onclick="syncMusic()" class="bg-[#4A5D4E] text-white px-4 rounded-xl font-bold text-xs">Sync</button>
+                }
+
+                if (node.type === 'tabGroup') {
+                    const activeChild = node.children.find(c => c.id === node.activeTabId) || node.children[0];
+                    return `
+                        <div class="flex flex-col w-full h-full bg-gray-900 border border-gray-700 rounded-md overflow-hidden drop-target shadow-lg" data-id="${node.id}">
+                            <div class="flex bg-gray-900 overflow-x-auto shrink-0 border-b border-gray-800">
+                                ${node.children.map(c => `
+                                    <div class="px-4 py-2 text-sm font-medium cursor-grab border-r border-gray-800 flex items-center gap-2 select-none 
+                                        ${c.id === activeChild.id ? 'bg-gray-800 text-blue-400 border-t-2 border-t-blue-500' : 'text-gray-500 hover:bg-gray-800/50 hover:text-gray-300 border-t-2 border-t-transparent'}"
+                                        onclick="System.setActiveTab('${node.id}', '${c.id}')"
+                                        onmousedown="System.startDrag(event, '${c.id}', false)">
+                                        ${c.title}
+                                        <button onclick="System.performWindowAction('${c.id}', 'close', event)" class="p-0.5 hover:bg-gray-700 rounded text-gray-500 hover:text-white transition-colors">
+                                            <svg class="w-3 h-3 close" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                        </button>
                                     </div>
-                                </div>
-                                <div class="space-y-1">
-                                    <label class="text-[10px] uppercase font-bold opacity-50">Local Volume</label>
-                                    <input type="range" min="0" max="100" value="40" oninput="ytPlayer.setVolume(this.value)" class="w-full">
-                                </div>
+                                `).join('')}
+                            </div>
+                            <div class="flex-1 relative bg-gray-950 p-2 overflow-auto">
+                                <div class="drag-shield"></div>
+                                ${activeChild.content || ''}
                             </div>
                         </div>
                     `;
-                    break;
-                default:
-                    container.innerHTML = `
-                        <div class="flex flex-col items-center justify-center h-full text-[#B5B5B5]">
-                            <div class="flex items-center gap-4">
-                                <span class="text-6xl">+</span>
-                                <span>select a widget</span>
+                }
+
+                if (node.type === 'window') {
+                    return `
+                        <div class="flex flex-col w-full h-full bg-gray-900 border border-gray-700 rounded-md overflow-hidden drop-target shadow-lg" data-id="${node.id}">
+                            ${renderHeader(node, false)}
+                            <div class="flex-1 relative bg-gray-950 p-2 overflow-auto text-gray-300">
+                                <div class="drag-shield"></div>
+                                ${node.content || ''}
                             </div>
                         </div>
                     `;
+                }
             }
-        }
-
-        function sendChat() {
-            const input = document.getElementById('widget-chat-input');
-            const text = input.value.trim();
-            if (!text) return;
-            
-            const msg = { type: 'chat', user: myName, text, time: Date.now() };
-            appendChat(msg, true);
-            Object.values(connections).forEach(c => c.send(msg));
-            input.value = '';
-        }
-
-        function handleIncomingChat(data) {
-            if (currentWidget === 'chat') {
-                appendChat(data, false);
+<!--onmousedown="System.bringToFront('${win.id}')-->
+            function renderFloating(windows) {
+                return windows.map(win => `
+                    <div id="float-${win.id}" class="absolute flex flex-col bg-gray-900 border border-gray-600 rounded-lg shadow-2xl overflow-hidden animate-pop drop-target"
+                         style="left: ${win.x}px; top: ${win.y}px; width: ${win.w}px; height: ${win.h}px; z-index: 30;"
+                         data-id="${win.id}"
+                         ">
+                        ${renderHeader(win, true)}
+                        <div class="flex-1 relative bg-gray-950 p-2 overflow-auto text-gray-300">
+                            <div class="drag-shield"></div>
+                            ${win.content || ''}
+                        </div>
+                        <div class="resize-handle" onmousedown="System.startResize(event, '${win.id}')">
+                            <svg class="w-full h-full text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                        </div>
+                    </div>
+                `).join('');
             }
-        }
 
-        function appendChat(msg, isMe) {
-            const box = document.getElementById('chat-box');
-            if (!box) return;
-            const div = document.createElement('div');
-            div.className = `p-3 rounded-2xl text-sm max-w-[80%] ${isMe ? 'bg-[#4A5D4E] text-white ml-auto rounded-tr-none' : 'bg-[#F0F0F0] rounded-tl-none'}`;
-            div.innerHTML = `<p class="text-[9px] font-bold opacity-50">${msg.user}</p><p>${msg.text}</p>`;
-            box.appendChild(div);
-            box.scrollTop = box.scrollHeight;
-        }
+            function render() {
+                // Topbar / Workspaces
+                const tabsHtml = state.workspaces.map(ws => `
+                    <button onclick="System.switchWorkspace('${ws.id}')" 
+                            class="px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${ws.id === state.activeWorkspaceId ? 'bg-gray-800 text-white shadow' : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/50'}">
+                        ${ws.name}
+                    </button>
+                `).join('');
+                document.getElementById('workspace-tabs').innerHTML = tabsHtml + `
+                    <button onclick="System.addWorkspace()" class="p-1.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded-md transition-colors" title="Add Workspace">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                    </button>
+                `;
 
-        function syncMusic() {
-            const val = document.getElementById('yt-id-input').value.trim();
-            if (!val) return;
-            const msg = { type: 'sync-music', videoId: val };
-            ytPlayer.loadVideoById(val);
-            Object.values(connections).forEach(c => c.send(msg));
-        }
+                // Dock
+                const dockEl = document.getElementById('dock');
+                if(state.minimizedWindows.length > 0) {
+                    dockEl.classList.remove('hidden');
+                    dockEl.innerHTML = `<span class="text-xs text-gray-400 font-semibold mr-2">DOCK</span>` + state.minimizedWindows.map(w => `
+                        <button onclick="System.performWindowAction('${w.id}', 'restore')" class="px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs text-white truncate max-w-[120px] shadow-sm animate-pop" title="${w.title}">
+                            ${w.title}
+                        </button>
+                    `).join('');
+                } else {
+                    dockEl.classList.add('hidden');
+                }
 
-        function handleMusicSync(data) {
-            if (ytPlayer && data.videoId) {
-                ytPlayer.loadVideoById(data.videoId);
+                // Main Area
+                const container = document.getElementById('workspace-container');
+                const ws = getWorkspace();
+
+                if (ws.maximizedNode) {
+                    const node = findNode(ws.rootNode, ws.maximizedNode) || ws.floatingWindows.find(w => w.id === ws.maximizedNode);
+                    if(node) {
+                        container.innerHTML = `<div class="w-full h-full z-40 absolute inset-0 bg-gray-950 p-2">${renderTree(node)}</div>`;
+                        return;
+                    }
+                }
+
+                let html = renderTree(ws.rootNode);
+                html += renderFloating(ws.floatingWindows);
+                container.innerHTML = html;
             }
-        }
+
+            // --- Public API ---
+            return {
+                init: () => render(),
+                startDrag,
+                startResize,
+                startSplitResize,
+                performWindowAction,
+                setActiveTab: (groupId, tabId) => {
+                    const ws = getWorkspace();
+                    const group = findNode(ws.rootNode, groupId);
+                    if (group) { group.activeTabId = tabId; render(); }
+                },
+                switchWorkspace: (id) => {
+                    state.activeWorkspaceId = id;
+                    render();
+                },
+                addWorkspace: () => {
+                    const id = uid();
+                    state.workspaces.push({ id, name: `Workspace ${state.workspaces.length + 1}`, rootNode: null, floatingWindows: [], maximizedNode: null });
+                    state.activeWorkspaceId = id;
+                    render();
+                },
+                addRandomWindow: () => {
+                    const titles = ['System Logs', 'Database Query', 'Graph View', 'Chat', 'Inspector'];
+                    const win = {
+                        id: uid(), type: 'window', 
+                        title: titles[Math.floor(Math.random() * titles.length)], 
+                        content: `<div class="p-4 text-gray-400"><button onClick="console.log('click')">Test</button></div>`
+                    };
+                    const ws = getWorkspace();
+                    
+                    if(!ws.rootNode) {
+                        ws.rootNode = win;
+                    } else {
+                        // Spawn as floating in center
+                        const rect = document.getElementById('workspace-container').getBoundingClientRect();
+                        win.x = rect.width / 2 - 200 + (Math.random()*40-20);
+                        win.y = rect.height / 2 - 150 + (Math.random()*40-20);
+                        win.w = 400; win.h = 300;
+                        ws.floatingWindows.push(win);
+                    }
+                    render();
+                },
+                bringToFront: (id) => {
+                    const ws = getWorkspace();
+                    const idx = ws.floatingWindows.findIndex(w => w.id === id);
+                    if(idx > -1) {
+                        const w = ws.floatingWindows.splice(idx, 1)[0];
+                        ws.floatingWindows.push(w);
+                        render();
+                    }
+                }
+            };
+        })();
+
+        // Boot
+        document.addEventListener('DOMContentLoaded', () => {
+            System.init();
+        });
     </script>
 </body>
 </html>
-
