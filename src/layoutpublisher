@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Variable Data Layout Sync</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #f1f5f9; height: 100vh; overflow: hidden; font-family: 'Inter', sans-serif; }
+        .main-container { display: flex; height: calc(100vh - 64px); }
+        
+        /* Data Pane */
+        .data-pane { width: 350px; border-right: 1px solid #e2e8f0; background: white; overflow: auto; shrink: 0; }
+        .record-row { cursor: pointer; border-bottom: 1px solid #f1f5f9; transition: all 0.2s; }
+        .record-row:hover { background: #f8fafc; }
+        .record-row.active { background: #eff6ff; border-left: 4px solid #3b82f6; }
+
+        /* Canvas Pane */
+        .layout-pane { flex-grow: 1; position: relative; overflow: auto; background: #cbd5e1; display: flex; flex-direction: column; align-items: center; padding: 40px; }
+        .page-canvas { 
+            width: 500px; height: 700px; 
+            background: white; box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+            position: relative; border: 1px solid #94a3b8;
+        }
+
+        /* Layout Element */
+        .layout-element {
+            position: absolute;
+            padding: 4px;
+            cursor: move;
+            border: 1px solid transparent;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .layout-element:hover { border: 1px dashed #3b82f6; }
+        .layout-element.selected { border: 1px solid #3b82f6; background: rgba(59, 130, 246, 0.05); }
+
+        .property-panel { width: 280px; background: white; border-left: 1px solid #e2e8f0; padding: 20px; shrink: 0; }
+    </style>
+</head>
+<body class="flex flex-col">
+
+    <!-- Navbar -->
+    <header class="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 z-50">
+        <div class="flex items-center gap-6">
+            <h1 class="font-bold text-xl text-slate-800">LayoutSync <span class="text-blue-600">VDP</span></h1>
+            <div class="flex bg-slate-100 rounded-lg p-1">
+                <button onclick="prevRecord()" class="p-1.5 hover:bg-white rounded-md transition shadow-sm"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg></button>
+                <div class="px-4 flex items-center text-sm font-medium">
+                    Record <span id="currentIndexDisplay" class="mx-1">1</span> of <span id="totalCountDisplay" class="mx-1">1</span>
+                </div>
+                <button onclick="nextRecord()" class="p-1.5 hover:bg-white rounded-md transition shadow-sm"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg></button>
+            </div>
+        </div>
+        <div class="flex gap-2">
+            <button onclick="document.getElementById('csvIn').click()" class="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50">Import CSV</button>
+            <input type="file" id="csvIn" class="hidden" accept=".csv" onchange="importCSV(event)">
+            <button onclick="addRecord()" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 shadow-sm">Add New Record</button>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <!-- Sidebar: Table/Records -->
+        <aside class="data-pane flex flex-col">
+            <div class="p-4 border-b border-slate-100 bg-slate-50 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                Records (Click to Navigate)
+            </div>
+            <div id="recordList" class="flex-1 overflow-y-auto">
+                <!-- Records injected here -->
+            </div>
+        </aside>
+
+        <!-- Center: Layout View -->
+        <main class="layout-pane">
+            <div id="pageCanvas" class="page-canvas">
+                <!-- Elements injected here -->
+            </div>
+            <div class="mt-6 text-slate-500 text-sm">Drag elements to design the layout template</div>
+        </main>
+
+        <!-- Right: Properties/Template Editor -->
+        <aside class="property-panel">
+            <h2 class="font-bold text-slate-800 mb-4">Template Mapping</h2>
+            <div id="mappingControls" class="space-y-4">
+                <div class="text-sm text-slate-500 italic">Select an element on the canvas to edit its mapping to the data row.</div>
+            </div>
+            <hr class="my-6">
+            <button onclick="addElement()" class="w-full py-2 bg-slate-100 border border-slate-200 text-slate-700 rounded-lg text-sm hover:bg-slate-200 transition mb-2">+ Add Text Element</button>
+            <button onclick="deleteElement()" class="w-full py-2 text-red-600 text-sm hover:bg-red-50 transition">Delete Selected</button>
+        </aside>
+    </div>
+
+    <script>
+        // Data Structure
+        // records: Array of objects representing the data (the "Table")
+        // template: Definition of where data fields appear on the layout
+        let state = {
+            records: [
+                { id: 0, "Name": "John Doe", "Title": "Creative Director", "Email": "john@example.com" },
+                { id: 1, "Name": "Jane Smith", "Title": "Senior Architect", "Email": "jane@example.com" }
+            ],
+            template: [
+                { id: 'el1', field: 'Name', x: 50, y: 50, fontSize: 32, fontWeight: '800', color: '#1e293b' },
+                { id: 'el2', field: 'Title', x: 50, y: 100, fontSize: 18, fontWeight: '400', color: '#64748b' },
+                { id: 'el3', field: 'Email', x: 50, y: 640, fontSize: 12, fontWeight: '500', color: '#3b82f6' }
+            ],
+            currentIndex: 0,
+            selectedElementId: null
+        };
+
+        let dragData = null;
+
+        window.onload = () => {
+            render();
+        };
+
+        function render() {
+            renderRecordList();
+            renderCanvas();
+            renderMapping();
+            updateNavigation();
+        }
+
+        function renderRecordList() {
+            const list = document.getElementById('recordList');
+            list.innerHTML = '';
+            state.records.forEach((rec, idx) => {
+                const div = document.createElement('div');
+                div.className = `record-row p-4 ${state.currentIndex === idx ? 'active' : ''}`;
+                div.onclick = () => { state.currentIndex = idx; render(); };
+                
+                // Show first few fields as a preview
+                const preview = Object.values(rec).slice(1, 3).join(' • ');
+                div.innerHTML = `
+                    <div class="text-sm font-semibold text-slate-800">${rec.Name || 'Untitled'}</div>
+                    <div class="text-xs text-slate-500 truncate">${preview}</div>
+                `;
+                list.appendChild(div);
+            });
+        }
+
+        function renderCanvas() {
+            const canvas = document.getElementById('pageCanvas');
+            canvas.innerHTML = '';
+            const currentRecord = state.records[state.currentIndex];
+
+            state.template.forEach(elDef => {
+                const div = document.createElement('div');
+                div.className = `layout-element ${state.selectedElementId === elDef.id ? 'selected' : ''}`;
+                div.style.left = elDef.x + 'px';
+                div.style.top = elDef.y + 'px';
+                div.style.fontSize = elDef.fontSize + 'px';
+                div.style.fontWeight = elDef.fontWeight;
+                div.style.color = elDef.color;
+                
+                // Map the text from the record
+                div.innerText = currentRecord[elDef.field] || `[Empty ${elDef.field}]`;
+
+                div.onmousedown = (e) => selectAndStartDrag(e, elDef);
+                canvas.appendChild(div);
+            });
+        }
+
+        function renderMapping() {
+            const panel = document.getElementById('mappingControls');
+            if (!state.selectedElementId) {
+                panel.innerHTML = '<div class="text-sm text-slate-500 italic">Select an element to map it to a table column.</div>';
+                return;
+            }
+
+            const el = state.template.find(t => t.id === state.selectedElementId);
+            const fields = Object.keys(state.records[0]).filter(k => k !== 'id');
+
+            panel.innerHTML = `
+                <div class="space-y-3">
+                    <label class="block text-xs font-bold text-slate-500 uppercase">Linked Column</label>
+                    <select onchange="updateElement('field', this.value)" class="w-full border rounded-md p-2 text-sm">
+                        ${fields.map(f => `<option value="${f}" ${el.field === f ? 'selected' : ''}>${f}</option>`).join('')}
+                    </select>
+                    
+                    <label class="block text-xs font-bold text-slate-500 uppercase mt-4">Manual Text Edit</label>
+                    <input type="text" value="${state.records[state.currentIndex][el.field] || ''}" 
+                           oninput="updateRecordField('${el.field}', this.value)"
+                           class="w-full border rounded-md p-2 text-sm" placeholder="Edit cell data...">
+
+                    <div class="grid grid-cols-2 gap-2 mt-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Size</label>
+                            <input type="number" value="${el.fontSize}" oninput="updateElement('fontSize', this.value)" class="w-full border rounded-md p-2 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Color</label>
+                            <input type="color" value="${el.color}" oninput="updateElement('color', this.value)" class="w-full border p-1 h-9 rounded-md">
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Action Logic
+        function updateRecordField(field, value) {
+            state.records[state.currentIndex][field] = value;
+            render();
+        }
+
+        function updateElement(key, value) {
+            const el = state.template.find(t => t.id === state.selectedElementId);
+            if (el) {
+                el[key] = value;
+                render();
+            }
+        }
+
+        function selectAndStartDrag(e, elDef) {
+            e.stopPropagation();
+            state.selectedElementId = elDef.id;
+            renderMapping();
+            renderCanvas(); // Refresh visual selection
+
+            const el = e.currentTarget;
+            const startX = e.clientX - el.offsetLeft;
+            const startY = e.clientY - el.offsetTop;
+
+            document.onmousemove = (moveE) => {
+                const canvas = document.getElementById('pageCanvas').getBoundingClientRect();
+                let nx = moveE.clientX - startX;
+                let ny = moveE.clientY - startY;
+                
+                elDef.x = nx;
+                elDef.y = ny;
+                el.style.left = nx + 'px';
+                el.style.top = ny + 'px';
+            };
+
+            document.onmouseup = () => {
+                document.onmousemove = null;
+                document.onmouseup = null;
+            };
+        }
+
+        function addElement() {
+            const id = 'el' + Date.now();
+            const firstField = Object.keys(state.records[0])[1]; // Skip 'id'
+            state.template.push({ id, field: firstField, x: 100, y: 100, fontSize: 16, fontWeight: '400', color: '#000000' });
+            state.selectedElementId = id;
+            render();
+        }
+
+        function deleteElement() {
+            state.template = state.template.filter(t => t.id !== state.selectedElementId);
+            state.selectedElementId = null;
+            render();
+        }
+
+        function addRecord() {
+            const newId = state.records.length;
+            const base = { ...state.records[0] };
+            Object.keys(base).forEach(k => { if(k !== 'id') base[k] = `New ${k}`; });
+            base.id = newId;
+            state.records.push(base);
+            state.currentIndex = newId;
+            render();
+        }
+
+        function importCSV(e) {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            reader.onload = (evt) => {
+                const lines = evt.target.result.split('\n').filter(l => l.trim());
+                if (lines.length < 2) return;
+                
+                const headers = lines[0].split(',').map(h => h.trim());
+                state.records = lines.slice(1).map((line, idx) => {
+                    const values = line.split(',');
+                    const obj = { id: idx };
+                    headers.forEach((h, i) => obj[h] = values[i] || "");
+                    return obj;
+                });
+                state.currentIndex = 0;
+                // Re-map elements to the first available column if necessary
+                state.template.forEach(t => t.field = headers[0]);
+                render();
+            };
+            reader.readAsText(file);
+        }
+
+        function nextRecord() {
+            if (state.currentIndex < state.records.length - 1) {
+                state.currentIndex++;
+                render();
+            }
+        }
+
+        function prevRecord() {
+            if (state.currentIndex > 0) {
+                state.currentIndex--;
+                render();
+            }
+        }
+
+        function updateNavigation() {
+            document.getElementById('currentIndexDisplay').innerText = state.currentIndex + 1;
+            document.getElementById('totalCountDisplay').innerText = state.records.length;
+        }
+
+        // Deselect if clicking canvas background
+        document.getElementById('pageCanvas').onclick = (e) => {
+            if (e.target.id === 'pageCanvas') {
+                state.selectedElementId = null;
+                render();
+            }
+        };
+    </script>
+</body>
+</html>
+
