@@ -393,7 +393,7 @@
                 // Check floating
                 const fIndex = ws.floatingWindows.findIndex(w => w.id === id);
                 if (fIndex > -1) {
-                    nodeToActOn = ws.floatingWindows[fIndex];
+                    nodeToActOn = ws.floatingWindows.splice(fIndex,1)[0];
                     isFloating = true;
                 }
 
@@ -411,28 +411,28 @@
                         nodeToActOn = state.minimizedWindows.splice(mIndex, 1)[0];
                     }
                 }
-
+				
                 if (!nodeToActOn) return; // Node not found
 
                 switch(action) {
                     case 'close':
                         // Discard node
-                        if(ws.maximizedNode === id) ws.maximizedNode = null;
+                        if(ws.nodeToActOn === id) ws.nodeToActOn = null;
                         break;
                     case 'minimize':
                         state.minimizedWindows.push(nodeToActOn);
-                        if(ws.maximizedNode === id) ws.maximizedNode = null;
+                        if(ws.nodeToActOn === id) ws.nodeToActOn = null;
                         if(isFloating) ws.floatingWindows.splice(fIndex, 1);
                         break;
                     case 'maximize':
                         // Toggle maximize
-                        if (ws.maximizedNode === id) {
+                        if (ws.nodeToActOn === id) {
                             ws.maximizedNode = null;
                             if(isFloating) ws.floatingWindows.push(nodeToActOn);
                             else ws.rootNode = insertNodeIntoTree(ws.rootNode, ws.rootNode?.id, nodeToActOn, 'right') || nodeToActOn; // Re-insert logic is simplified here; ideally stores previous location
                         } else {
                             ws.maximizedNode = id;
-                            if(isFloating) ws.floatingWindows.splice(fIndex, 1);
+                            if(isFloating) ws.floatingWindows.splice(fIndex, 1)[0];
                             // We put it back where we found it to keep state, just mark maximized
                             if(!isFloating && ws.rootNode !== nodeToActOn) {
                                 ws.rootNode = insertNodeIntoTree(ws.rootNode, ws.rootNode?.id, nodeToActOn, 'center') || nodeToActOn; 
@@ -440,7 +440,7 @@
                         }
                         break;
                     case 'popout':
-                        if (ws.maximizedNode === id) ws.maximizedNode = null;
+                        if (ws.nodeToActOn === id) ws.nodeToActOn = null;
                         // Calculate a nice default floating size based on viewport
                         if(!nodeToActOn.x) {
                             const rect = document.getElementById('ui-workspace-main').getBoundingClientRect();
@@ -936,7 +936,8 @@
                     <div id="float-${win.id}" data-element="floating-window" class="absolute flex flex-col window-card drop-target"
                          style="left: ${win.x}px; top: ${win.y}px; width: ${win.w}px; height: ${win.h}px; z-index: 30;"
                          data-id="${win.id}"
-                         onmousedown="System.bringToFront('${win.id}')">
+						 onmousedown="System.bringToFront(event,'${win.id}')"
+                         >
                         ${renderHeader(win, true)}
                         <div class="px-3 pb-3 flex-1 flex flex-col min-h-0">
                             <div data-element="window-content" class="nm-inner flex-1 relative p-4 overflow-auto">
@@ -1038,7 +1039,8 @@
                     }
                     render();
                 },
-                bringToFront: (id) => {
+                bringToFront: (e,id) => {
+					if (e.target.closest('.window-controls') || e.target.closest('.resize-handle')) return;
                     const ws = getWorkspace();
                     const idx = ws.floatingWindows.findIndex(w => w.id === id);
                     if(idx > -1) {
