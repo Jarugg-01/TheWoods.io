@@ -282,7 +282,7 @@
                                     id: uid(), type: 'split', direction: 'vertical', ratio: 0.5,
                                     children: [
                                         { id: uid(), type: 'window', title: 'Terminal', content: '<div class="p-4 font-mono text-sm opacity-80">$ npm start<br/>> Server running on port 3000</div>' },
-                                        { id: uid(), type: 'window', title: 'Preview', content: '<div class="flex opacity-60 font-bold" style="width:100%;height:100%;"><iframe src="./src/index - grove with voice and channels.html" title="test" style="width:100%;height:100%;"></iframe></div>' }
+                                        { id: uid(), type: 'window', title: 'Preview', content: '<div class="flex opacity-60 font-bold" style="width:100%;height:100%;">Preview</div>' }
                                     ]
                                 }
                             ]
@@ -290,8 +290,8 @@
                         floatingWindows: [], maximizedNode: null
                     },
                     {
-                        id: 'ws-2', name: 'Monitoring',
-                        rootNode: { id: uid(), type: 'window', title: 'Metrics Dashboard', content: '<div class="flex items-center justify-center h-full text-[var(--accent)] font-bold">System Analytics</div>' },
+                        id: 'ws-2', name: 'Voice & Chat',
+                        rootNode: { id: uid(), type: 'window', title: 'Metrics Dashboard', content: '<div style="width:100%;height:100%; class="flex "><iframe src="./src/index - grove with voice and channels.html" title="test" style="width:100%;height:100%;"></iframe></div>' },
                         floatingWindows: [], maximizedNode: null
                     }
                 ],
