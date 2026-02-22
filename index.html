@@ -29,6 +29,10 @@
             line-height: 1.6;
             overflow: hidden;
         }
+		
+		.relative {
+			padding: .5em;
+		}
 
         /* Base styles and custom scrollbar */
         ::-webkit-scrollbar { width: 8px; height: 8px; }
@@ -278,7 +282,7 @@
                                     id: uid(), type: 'split', direction: 'vertical', ratio: 0.5,
                                     children: [
                                         { id: uid(), type: 'window', title: 'Terminal', content: '<div class="p-4 font-mono text-sm opacity-80">$ npm start<br/>> Server running on port 3000</div>' },
-                                        { id: uid(), type: 'window', title: 'Preview', content: '<div class="flex items-center justify-center h-full opacity-60 font-bold">App Preview</div>' }
+                                        { id: uid(), type: 'window', title: 'Preview', content: '<div class="flex opacity-60 font-bold" style="width:100%;height:100%;"><iframe src="./src/index - grove with voice and channels.html" title="test" style="width:100%;height:100%;"></iframe></div>' }
                                     ]
                                 }
                             ]
